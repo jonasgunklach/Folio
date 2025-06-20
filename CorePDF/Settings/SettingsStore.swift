@@ -33,6 +33,24 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Tab Bar Style
+
+enum TabBarStyle: String, CaseIterable, Identifiable {
+    /// Pills embedded in the toolbar's principal slot (compact).
+    case toolbar = "In Toolbar"
+    /// Dedicated tab strip row pinned between the toolbar and the document.
+    case bar     = "Tab Bar"
+
+    var id: String { rawValue }
+
+    var symbolName: String {
+        switch self {
+        case .toolbar: "square.grid.3x1.below.line.grid.1x2"
+        case .bar:     "menubar.rectangle"
+        }
+    }
+}
+
 // MARK: - Settings Store
 
 /// Persistent application preferences, backed by UserDefaults.
@@ -60,6 +78,10 @@ final class SettingsStore {
 
     var restoreDocumentsOnLaunch: Bool = false {
         didSet { save(restoreDocumentsOnLaunch, key: Keys.restoreDocumentsOnLaunch) }
+    }
+
+    var tabBarStyle: TabBarStyle = .toolbar {
+        didSet { save(tabBarStyle.rawValue, key: Keys.tabBarStyle) }
     }
 
     // MARK: Display
@@ -90,18 +112,10 @@ final class SettingsStore {
         didSet { saveColor(strikethroughColor, key: Keys.strikethroughColor) }
     }
 
-    var freehandColor: Color = .blue {
-        didSet { saveColor(freehandColor, key: Keys.freehandColor) }
-    }
-
-    var freehandLineWidth: Double = 2.0 {
-        didSet { save(freehandLineWidth, key: Keys.freehandLineWidth) }
-    }
-
     // MARK: Tools
 
     /// The annotation tools visible in the toolbar segmented picker.
-    var visibleTools: Set<ActiveTool> = [.select, .highlight, .underline, .strikethrough, .freehand, .text] {
+    var visibleTools: Set<ActiveTool> = [.select, .highlight, .underline, .strikethrough, .text, .signature] {
         didSet {
             let raw = visibleTools.map(\.rawValue)
             UserDefaults.standard.set(raw, forKey: Keys.visibleTools)
@@ -116,14 +130,13 @@ final class SettingsStore {
         defaultReadingMode   = ReadingMode(rawValue: d.string(forKey: Keys.defaultReadingMode) ?? "") ?? .default
         showSidebarByDefault = d.object(forKey: Keys.showSidebarByDefault) as? Bool ?? true
         restoreDocumentsOnLaunch = d.bool(forKey: Keys.restoreDocumentsOnLaunch)
+        tabBarStyle          = TabBarStyle(rawValue: d.string(forKey: Keys.tabBarStyle) ?? "") ?? .toolbar
         if d.object(forKey: Keys.defaultZoom) != nil { defaultZoom = d.double(forKey: Keys.defaultZoom) }
         defaultViewMode      = ViewMode(rawValue: d.string(forKey: Keys.defaultViewMode) ?? "") ?? .scroll
         highlightColor       = loadColor(key: Keys.highlightColor) ?? .yellow
         if d.object(forKey: Keys.highlightOpacity) != nil { highlightOpacity = d.double(forKey: Keys.highlightOpacity) }
         underlineColor       = loadColor(key: Keys.underlineColor) ?? .blue
         strikethroughColor   = loadColor(key: Keys.strikethroughColor) ?? .red
-        freehandColor        = loadColor(key: Keys.freehandColor) ?? .blue
-        if d.object(forKey: Keys.freehandLineWidth) != nil { freehandLineWidth = d.double(forKey: Keys.freehandLineWidth) }
         if let raw = d.stringArray(forKey: Keys.visibleTools) {
             let tools = raw.compactMap(ActiveTool.init(rawValue:))
             if !tools.isEmpty { visibleTools = Set(tools) }
@@ -154,14 +167,13 @@ final class SettingsStore {
         static let defaultReadingMode       = "settings.defaultReadingMode"
         static let showSidebarByDefault     = "settings.showSidebarByDefault"
         static let restoreDocumentsOnLaunch = "settings.restoreDocumentsOnLaunch"
+        static let tabBarStyle              = "settings.tabBarStyle"
         static let defaultZoom              = "settings.defaultZoom"
         static let defaultViewMode          = "settings.defaultViewMode"
         static let highlightColor           = "settings.highlightColor"
         static let highlightOpacity         = "settings.highlightOpacity"
         static let underlineColor           = "settings.underlineColor"
         static let strikethroughColor       = "settings.strikethroughColor"
-        static let freehandColor            = "settings.freehandColor"
-        static let freehandLineWidth        = "settings.freehandLineWidth"
         static let visibleTools             = "settings.visibleTools"
     }
 }

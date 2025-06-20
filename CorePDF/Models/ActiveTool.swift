@@ -29,8 +29,7 @@ enum ActiveTool: String, CaseIterable, Identifiable {
     case highlight      = "Highlight"
     case strikethrough  = "Strikethrough"
     case underline      = "Underline"
-    case freehand       = "Freehand"
-    case text           = "Text Box"
+    case text           = "Comment"
     case stamp          = "Stamp"
     case signature      = "Signature"
     case audioNote      = "Audio Note"
@@ -39,15 +38,27 @@ enum ActiveTool: String, CaseIterable, Identifiable {
 
     var symbolName: String {
         switch self {
-        case .select:           "arrow.up.left.and.arrow.down.right"
-        case .highlight:        "highlighter"
+        case .select:           "cursorarrow"
+        case .highlight:        "a.square.fill"
         case .strikethrough:    "strikethrough"
         case .underline:        "underline"
-        case .freehand:         "pencil.tip"
-        case .text:             "character.cursor.ibeam"
+        case .text:             "bubble.left.fill"
         case .stamp:            "stamp.fill"
         case .signature:        "signature"
         case .audioNote:        "mic.fill"
+        }
+    }
+
+    /// Human-readable keyboard shortcut key for display in Settings.
+    var keyboardShortcut: String? {
+        switch self {
+        case .select:        "E"
+        case .highlight:     "H"
+        case .underline:     "U"
+        case .strikethrough: "K"
+        case .text:          "C"
+        case .signature:     "G"
+        default:             nil
         }
     }
 

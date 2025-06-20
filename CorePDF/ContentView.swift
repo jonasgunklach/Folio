@@ -32,6 +32,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
 
     @Environment(AppState.self) private var appState
+    @Environment(SettingsStore.self) private var settings
 
     private var tab: DocumentTab? { appState.activeTab }
     private var hasDoc: Bool { tab != nil }
@@ -40,7 +41,8 @@ struct ContentView: View {
         HStack(spacing: 0) {
             // ── Thumbnail sidebar ──────────────────────────────────────
             if appState.isSidebarVisible, let tab {
-                ThumbnailSidebarView(document: tab.document, activeTab: tab)
+                ThumbnailSidebarView(document: tab.document, activeTab: tab,
+                                     isInteractive: tab.viewMode == .scroll)
                     .frame(width: 200)
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 Divider()
@@ -64,6 +66,15 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isSidebarVisible)
+        // ── Tab bar row (pinned below toolbar when style == .bar) ─────
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if settings.tabBarStyle == .bar {
+                VStack(spacing: 0) {
+                    TabBarRowView()
+                    Divider()
+                }
+            }
+        }
 
         // ── Toolbar ────────────────────────────────────────────────────
         .toolbar {
@@ -84,47 +95,38 @@ struct ContentView: View {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
             }
 
-            // ── Left: Open + page navigation ──────────────────────────
+            // ── Left: page navigation ────────────────────────────
             ToolbarItem(placement: .navigation) {
-                Button {
-                    appState.isFileImporterPresented = true
-                } label: {
-                    Label("Open PDF", systemImage: "folder.badge.plus")
-                }
-                .help("Open PDF (⌘O)")
-            }
-
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     Button {
                         guard let tab else { return }
                         tab.currentPageIndex = max(tab.currentPageIndex - 1, 0)
-                    } label: { Image(systemName: "chevron.left") }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 20, height: 22)
+                    }
                     .disabled(!hasDoc)
                     .help("Previous Page")
 
                     Text(tab.map { "\($0.currentPageLabel) / \($0.pageCount)" } ?? "— / —")
                         .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .frame(minWidth: 64)
+                        .frame(minWidth: 42, alignment: .center)
 
                     Button {
                         guard let tab else { return }
                         tab.currentPageIndex = min(tab.currentPageIndex + 1, tab.pageCount - 1)
-                    } label: { Image(systemName: "chevron.right") }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 20, height: 22)
+                    }
                     .disabled(!hasDoc)
                     .help("Next Page")
                 }
             }
 
-            // ── Centre: Tab strip (Safari-style) ──────────────────────
-            ToolbarItem(placement: .principal) {
-                DocumentTabBar()
-                    .frame(minWidth: 300, maxWidth: .infinity)
-            }
-
-            // ── Right: View mode + tools + reading mode ────────────────
-            ToolbarItem(placement: .primaryAction) {
+            // ── Left: view mode (scroll / grid) ───────────────────────
+            ToolbarItem(placement: .navigation) {
                 Picker("View", selection: Binding(
                     get: { tab?.viewMode ?? .scroll },
                     set: { tab?.viewMode = $0 }
@@ -139,33 +141,21 @@ struct ContentView: View {
                 .help("View Mode")
             }
 
-            ToolbarItem(placement: .primaryAction) {
-                // Zoom group (only relevant in scroll view)
-                HStack(spacing: 0) {
-                    Button { tab?.viewerViewModel.zoomOut() } label: {
-                        Image(systemName: "minus")
-                    }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Zoom Out (⌘−)")
-
-                    Button { tab?.viewerViewModel.zoomToFit() } label: {
-                        Text(tab.map {
-                            String(format: "%.0f%%", $0.viewerViewModel.scaleFactor * 100)
-                        } ?? "—")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .frame(minWidth: 44)
-                    }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Actual Size (⌘0)")
-
-                    Button { tab?.viewerViewModel.zoomIn() } label: {
-                        Image(systemName: "plus")
-                    }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Zoom In (⌘=)")
+            // ── Centre: Tab strip (toolbar style) or invisible anchor (.bar style)
+            // The principal item MUST always contain a non-empty view so that
+            // NSToolbar registers a centred item and inserts the flexible-space
+            // separators that push .navigation items left and .primaryAction right.
+            ToolbarItem(placement: .principal) {
+                if settings.tabBarStyle == .toolbar {
+                    DocumentTabBar()
+                        .frame(minWidth: 300, maxWidth: .infinity)
+                } else {
+                    // Transparent 1-pt anchor — keeps NSToolbar's three-zone layout.
+                    Color.clear.frame(width: 1, height: 1)
                 }
             }
 
+            // ── Right group 1: Annotation tools ───────────────────────
             ToolbarItem(placement: .primaryAction) {
                 Picker("Tool", selection: Binding(
                     get: { appState.activeTool },
@@ -179,20 +169,49 @@ struct ContentView: View {
                 .fixedSize()
                 .disabled(!hasDoc || tab?.viewMode == .grid)
                 .help("Annotation Tools")
-                // Hidden buttons capture per-tool keyboard shortcuts
                 .background {
                     Group {
-                        Button("") { if hasDoc { appState.activeTool = .select }    }.keyboardShortcut("e", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .highlight } }.keyboardShortcut("h", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .underline } }.keyboardShortcut("u", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .strikethrough } }.keyboardShortcut("k", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .freehand } }.keyboardShortcut("f", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .text } }.keyboardShortcut("t", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .select }       }.keyboardShortcut("e", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .highlight }    }.keyboardShortcut("h", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .underline }    }.keyboardShortcut("u", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .strikethrough }}.keyboardShortcut("k", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .text }         }.keyboardShortcut("c", modifiers: [])
+                        Button("") { if hasDoc { appState.activeTool = .signature }    }.keyboardShortcut("g", modifiers: [])
                     }
                     .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
                 }
             }
 
+            // ── Right group 2: Zoom ───────────────────────────────────
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 0) {
+                    Button { tab?.viewerViewModel.zoomOut() } label: {
+                        Image(systemName: "minus")
+                            .frame(width: 20, height: 22)
+                    }
+                    .disabled(!hasDoc || tab?.viewMode == .grid)
+                    .help("Zoom Out (⌘−)")
+
+                    Button { tab?.viewerViewModel.zoomToFit() } label: {
+                        Text(tab.map {
+                            String(format: "%.0f%%", $0.viewerViewModel.scaleFactor * 100)
+                        } ?? "—")
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .frame(minWidth: 36, alignment: .center)
+                    }
+                    .disabled(!hasDoc || tab?.viewMode == .grid)
+                    .help("Actual Size (⌘0)")
+
+                    Button { tab?.viewerViewModel.zoomIn() } label: {
+                        Image(systemName: "plus")
+                            .frame(width: 20, height: 22)
+                    }
+                    .disabled(!hasDoc || tab?.viewMode == .grid)
+                    .help("Zoom In (⌘=)")
+                }
+            }
+
+            // ── Right group 3 (rightmost): Reading mode ───────────────
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     ForEach(ReadingMode.allCases) { mode in
@@ -203,11 +222,11 @@ struct ContentView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: tab?.readingMode.symbolName ?? "sun.max")
+                    Image(systemName: tab?.readingMode.symbolName ?? ReadingMode.default.symbolName)
                         .symbolRenderingMode(.multicolor)
                 }
                 .disabled(!hasDoc)
-                .help("Reading Mode")
+                .help("Reading Mode: \(tab?.readingMode.rawValue ?? "Default")")
             }
         }
         .fileImporter(

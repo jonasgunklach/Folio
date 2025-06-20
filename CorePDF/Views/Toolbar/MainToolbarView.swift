@@ -109,9 +109,8 @@ struct MainToolbarView: View {
 
             tbSep
 
-            // ── Drawing ───────────────────────────────────────────────
+            // ── Text / Drawing ────────────────────────────────────────
             HStack(spacing: 2) {
-                toolBtn(.freehand)
                 toolBtn(.text)
             }
 

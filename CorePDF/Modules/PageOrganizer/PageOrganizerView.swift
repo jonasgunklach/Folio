@@ -84,7 +84,20 @@ struct PageOrganizerView: View {
                     viewModel.copySelectedPages()
                 } label: { Image(systemName: "doc.on.doc") }
                 .disabled(viewModel.selectedIndices.isEmpty)
-                .help("Copy Selected Pages to Clipboard")
+                .help("Copy Selected Pages (⌘C)")
+
+                Button {
+                    if viewModel.pastePages(into: tab.document) {
+                        tab.isModified = true
+                    }
+                } label: { Image(systemName: "doc.on.clipboard") }
+                .help("Paste Pages from Clipboard (⌘V)")
+
+                Button {
+                    viewModel.addEmptyPage(into: tab.document)
+                    tab.isModified = true
+                } label: { Image(systemName: "plus.rectangle") }
+                .help("Add Empty Page")
 
                 Divider().frame(height: 16)
 
@@ -179,6 +192,18 @@ struct PageOrganizerView: View {
         }
         .onAppear {
             viewModel.load(document: tab.document)
+        }
+        // ── Keyboard shortcuts ─────────────────────────────────────
+        .background {
+            Group {
+                Button("") {
+                    viewModel.copySelectedPages()
+                }.keyboardShortcut("c", modifiers: .command)
+                Button("") {
+                    if viewModel.pastePages(into: tab.document) { tab.isModified = true }
+                }.keyboardShortcut("v", modifiers: .command)
+            }
+            .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
         }
     }
 

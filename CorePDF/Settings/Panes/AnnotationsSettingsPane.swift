@@ -31,17 +31,6 @@ struct AnnotationsSettingsPane: View {
             Section("Strikethrough") {
                 ColorPicker("Color", selection: $settings.strikethroughColor, supportsOpacity: false)
             }
-
-            Section("Freehand") {
-                ColorPicker("Color", selection: $settings.freehandColor, supportsOpacity: false)
-                HStack {
-                    Text("Line width")
-                    Slider(value: $settings.freehandLineWidth, in: 1.0...10.0, step: 0.5)
-                    Text(String(format: "%.1f pt", settings.freehandLineWidth))
-                        .font(.system(size: 12).monospacedDigit())
-                        .frame(width: 44, alignment: .trailing)
-                }
-            }
         }
         .formStyle(.grouped)
         .padding(.vertical, 8)

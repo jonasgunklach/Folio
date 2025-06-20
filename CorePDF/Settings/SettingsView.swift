@@ -33,25 +33,25 @@ struct SettingsView: View {
     @State private var selection: SettingsPane = .general
 
     var body: some View {
-        NavigationSplitView(columnVisibility: .constant(.all)) {
-            List(SettingsPane.allCases, selection: $selection) { pane in
-                Label(pane.rawValue, systemImage: pane.symbolName)
+        TabView(selection: $selection) {
+            ForEach(SettingsPane.allCases) { pane in
+                settingsContent(for: pane)
+                    .tabItem {
+                        Label(pane.rawValue, systemImage: pane.symbolName)
+                    }
                     .tag(pane)
             }
-            .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 210)
-            .navigationTitle("Settings")
-        } detail: {
-            Group {
-                switch selection {
-                case .general:     GeneralSettingsPane()
-                case .display:     DisplaySettingsPane()
-                case .annotations: AnnotationsSettingsPane()
-                case .tools:       ToolsSettingsPane()
-                }
-            }
-            .navigationTitle(selection.rawValue)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(minWidth: 620, idealWidth: 680, minHeight: 420, idealHeight: 480)
+        .frame(minWidth: 480, idealWidth: 520, minHeight: 360, idealHeight: 400)
+    }
+
+    @ViewBuilder
+    private func settingsContent(for pane: SettingsPane) -> some View {
+        switch pane {
+        case .general:     GeneralSettingsPane()
+        case .display:     DisplaySettingsPane()
+        case .annotations: AnnotationsSettingsPane()
+        case .tools:       ToolsSettingsPane()
+        }
     }
 }

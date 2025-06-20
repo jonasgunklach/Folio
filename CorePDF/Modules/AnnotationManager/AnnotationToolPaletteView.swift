@@ -41,12 +41,14 @@ struct AnnotationToolPaletteView: View {
                 UnderlinePaletteControls(viewModel: viewModel)
             case .strikethrough:
                 StrikethroughPaletteControls(viewModel: viewModel)
-            case .freehand:
-                FreehandPaletteControls(viewModel: viewModel)
             case .stamp:
                 StampPaletteControls(viewModel: viewModel)
             case .text:
-                Label("Click on the page to add a comment", systemImage: "bubble.left.fill")
+                Label("Click anywhere to place a comment", systemImage: "bubble.left.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case .signature:
+                Label("Click anywhere to place your signature", systemImage: "signature")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             default:
@@ -163,44 +165,6 @@ private func colorSwatch(_ color: NSColor, selected: Bool, action: @escaping () 
             if selected { Circle().strokeBorder(.primary, lineWidth: 2) }
         }
         .onTapGesture { action() }
-}
-
-// MARK: - Freehand Controls
-
-struct FreehandPaletteControls: View {
-
-    var viewModel: AnnotationManagerViewModel
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text("Color")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            ColorPicker("", selection: Binding(
-                get: { Color(viewModel.freehandColor) },
-                set: { viewModel.freehandColor = NSColor($0) }
-            ))
-            .labelsHidden()
-
-            Divider().frame(height: 18)
-
-            Text("Width")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Slider(value: Binding(
-                get: { viewModel.freehandLineWidth },
-                set: { viewModel.freehandLineWidth = $0 }
-            ), in: 0.5...10.0)
-            .frame(width: 80)
-
-            Text(String(format: "%.1f pt", viewModel.freehandLineWidth))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 42)
-        }
-    }
 }
 
 // MARK: - Stamp Controls

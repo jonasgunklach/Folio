@@ -1,5 +1,9 @@
 # CorePDF
 
+<p align="center">
+  <img src="Screenshots/icon.png" width="128" alt="CorePDF icon">
+</p>
+
 A native macOS PDF editor built with SwiftUI, PDFKit, and the Swift Observation framework. Designed to feel at home on macOS 26 with a "Liquid Glass" toolbar aesthetic.
 
 ## Features

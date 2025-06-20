@@ -72,6 +72,16 @@ final class AppState {
         activeTabID = tab.id
     }
 
+    /// Creates a new empty single-page PDF document in a new tab.
+    func openEmptyDocument() {
+        let document = PDFDocument()
+        let page = PDFPage()
+        document.insert(page, at: 0)
+        let tab = DocumentTab(document: document)
+        tabs.append(tab)
+        activeTabID = tab.id
+    }
+
     func closeTab(_ id: UUID) {
         if let tab = tabs.first(where: { $0.id == id }), tab.isModified {
             tabPendingClose = tab

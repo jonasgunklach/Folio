@@ -23,6 +23,7 @@
 // THE SOFTWARE.
 
 import SwiftUI
+import PDFKit
 
 // MARK: - Tab Bar
 
@@ -54,9 +55,10 @@ struct DocumentTabBar: View {
                 .animation(.spring(response: 0.28, dampingFraction: 0.78), value: appState.tabs.map(\.id))
             }
 
-            // "+" open-new-tab button
-            Button {
-                appState.isFileImporterPresented = true
+            // "+" new tab menu
+            Menu {
+                Button("Open PDF…") { appState.isFileImporterPresented = true }
+                Button("New Empty Document") { appState.openEmptyDocument() }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .semibold))
@@ -64,8 +66,9 @@ struct DocumentTabBar: View {
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .help("Open PDF (⌘O)")
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("New Tab")
             .padding(.trailing, 4)
         }
         // Transparent background — toolbar provides the glass chrome
@@ -79,30 +82,48 @@ struct DocumentTabItem: View {
     @Environment(AppState.self) private var appState
     let tab: DocumentTab
     @State private var isHovered = false
+    @State private var coverImage: NSImage?
 
     private var isActive: Bool { appState.activeTabID == tab.id }
 
     var body: some View {
-        HStack(spacing: 6) {
-            // Document type icon — replaced by a spinner while saving
-            if tab.isSaving {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .scaleEffect(0.5)
-                    .frame(width: 14, height: 14)
-            } else {
-                Image(systemName: tab.isModified ? "doc.badge.ellipsis" : "doc.fill")
-                    .symbolRenderingMode(.multicolor)
-                    .font(.system(size: 10))
-                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
-            }
+        HStack(spacing: 5) {
+            // First-page mini-thumbnail (or spinner while saving)
+            ZStack(alignment: .bottomTrailing) {
+                if tab.isSaving {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.5)
+                        .frame(width: 18, height: 22)
+                } else if let img = coverImage {
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 22)
+                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                        // Visible border so white pages don't vanish against the toolbar
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 2)
+                                .strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.75)
+                        )
+                        .shadow(color: .black.opacity(0.12), radius: 1, y: 0.5)
+                        .opacity(isActive ? 1 : 0.65)
+                } else {
+                    Image(systemName: "doc.fill")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 10))
+                        .frame(width: 18, height: 22)
+                        .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                }
 
-            // File name
-            Text(tab.title)
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                .frame(maxWidth: 140, alignment: .leading)
+                // Unsaved changes indicator — blue dot bottom-right corner
+                if tab.isModified {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 6, height: 6)
+                        .offset(x: 3, y: 3)
+                }
+            }
 
             // Close button — visible on hover or when active
             Button {
@@ -113,7 +134,7 @@ struct DocumentTabItem: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 14, height: 14)
                     .background(
                         Circle()
                             .fill(Color.primary.opacity(isHovered ? 0.12 : 0))
@@ -122,9 +143,8 @@ struct DocumentTabItem: View {
             .buttonStyle(.plain)
             .opacity((isActive || isHovered) ? 1 : 0)
         }
-        .padding(.horizontal, 10)
-        .frame(minWidth: 90, maxWidth: 170)
-        .frame(height: 26)
+        .padding(.horizontal, 8)
+        .frame(width: 52, height: 30)
         // ── Background ──────────────────────────────────────────────
         .background {
             RoundedRectangle(cornerRadius: 7)
@@ -133,13 +153,13 @@ struct DocumentTabItem: View {
                         ? Color(NSColor.controlBackgroundColor)
                         : Color.primary.opacity(isHovered ? 0.06 : 0)
                 )
-                // Elevated shadow only on active tab, like Safari
                 .shadow(
                     color: isActive ? .black.opacity(0.10) : .clear,
                     radius: 3, y: 1
                 )
         }
         .contentShape(RoundedRectangle(cornerRadius: 7))
+        .help(tab.isModified ? "\(tab.title) — Unsaved changes" : tab.title)
         .onTapGesture {
             appState.activateTab(tab.id)
         }
@@ -147,6 +167,121 @@ struct DocumentTabItem: View {
             withAnimation(.easeInOut(duration: 0.12)) { isHovered = hovered }
         }
         .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isActive)
+        .task(id: tab.id) {
+            coverImage = await Task.detached(priority: .utility) {
+                tab.document.page(at: 0)?.thumbnail(of: CGSize(width: 36, height: 44), for: .mediaBox)
+            }.value
+        }
+    }
+}
+
+// MARK: - Tab Bar Row (full-width, below toolbar)
+
+/// Safari-style tab bar: equal-width tabs on a gray strip,
+/// active tab is a white rounded pill with shadow, inactive tabs are transparent.
+struct TabBarRowView: View {
+
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(appState.tabs) { tab in
+                NativeTabCell(tab: tab)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+
+            // "+" new tab menu
+            Menu {
+                Button("Open PDF…") { appState.isFileImporterPresented = true }
+                Button("New Empty Document") { appState.openEmptyDocument() }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("New Tab")
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .frame(height: 38)
+        .background(.bar)
+        .animation(.spring(response: 0.28, dampingFraction: 0.78), value: appState.tabs.map(\.id))
+    }
+}
+
+// MARK: - Native Tab Cell
+
+private struct NativeTabCell: View {
+
+    @Environment(AppState.self) private var appState
+    let tab: DocumentTab
+    @State private var isHovered = false
+
+    private var isActive: Bool { appState.activeTabID == tab.id }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if tab.isSaving {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .scaleEffect(0.5)
+                    .frame(width: 12, height: 12)
+            } else {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "doc.fill")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 10))
+                        .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                    if tab.isModified {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 4, y: -3)
+                    }
+                }
+            }
+
+            Text(tab.title)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+
+            Button {
+                withAnimation(.spring(response: 0.22, dampingFraction: 0.75)) {
+                    appState.closeTab(tab.id)
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 14, height: 14)
+                    .background(Circle().fill(Color.primary.opacity(isHovered ? 0.12 : 0)))
+            }
+            .buttonStyle(.plain)
+            .opacity((isActive || isHovered) ? 1 : 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
+        .background {
+            if isActive {
+                Capsule()
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.10), radius: 2, y: 1)
+                    .overlay(Capsule().strokeBorder(.separator.opacity(0.4), lineWidth: 0.5))
+            } else if isHovered {
+                Capsule()
+                    .fill(Color.primary.opacity(0.06))
+            }
+        }
+        .contentShape(Capsule())
+        .onTapGesture { appState.activateTab(tab.id) }
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.1), value: isActive)
     }
 }
 

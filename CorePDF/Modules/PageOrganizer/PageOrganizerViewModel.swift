@@ -107,6 +107,44 @@ final class PageOrganizerViewModel {
         NSPasteboard.general.setData(data, forType: .pdf)
     }
 
+    // MARK: - Add Blank Page
+
+    /// Inserts a new blank A4 PDF page after the last selected page (or at end).
+    func addEmptyPage(into document: PDFDocument) {
+        let blankPage = PDFPage()
+        let insertAt = (selectedIndices.max().map { $0 + 1 }) ?? pages.count
+        pages.insert(blankPage, at: insertAt)
+        applyOrder(to: document)
+        selectedIndices = [insertAt]
+    }
+
+    // MARK: - Paste from Clipboard
+
+    /// Pastes PDF pages from the clipboard after the last selected page
+    /// (or at the end if nothing is selected). Returns true if anything was pasted.
+    @discardableResult
+    func pastePages(into document: PDFDocument) -> Bool {
+        guard let data = NSPasteboard.general.data(forType: .pdf),
+              let source = PDFDocument(data: data),
+              source.pageCount > 0 else { return false }
+
+        // Insert after the highest selected index, or at end.
+        let insertBefore = (selectedIndices.max().map { $0 + 1 }) ?? pages.count
+        var inserted = 0
+        for i in 0..<source.pageCount {
+            guard let page = source.page(at: i)?.copy() as? PDFPage else { continue }
+            let at = insertBefore + inserted
+            pages.insert(page, at: at)
+            inserted += 1
+        }
+        if inserted > 0 {
+            applyOrder(to: document)
+            // Select the newly pasted pages.
+            selectedIndices = Set((insertBefore..<(insertBefore + inserted)))
+        }
+        return inserted > 0
+    }
+
     // MARK: - Extract
 
     func extractPages(_ indices: Set<Int>) -> PDFDocument? {

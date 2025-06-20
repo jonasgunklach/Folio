@@ -67,7 +67,11 @@ struct SidebarView: View {
                 if let tab = appState.activeTab {
                     switch selectedSection {
                     case .thumbnails:
-                        ThumbnailListView(document: tab.document, activeTab: tab)
+                        ThumbnailListView(
+                            document: tab.document,
+                            activeTab: tab,
+                            isInteractive: tab.viewMode == .scroll
+                        )
                     case .outline:
                         OutlineView(document: tab.document)
                     case .bookmarks:
@@ -128,24 +132,37 @@ struct ThumbnailListView: View {
 
     let document: PDFDocument
     let activeTab: DocumentTab
+    /// When false, thumbnails show but tapping them does nothing (e.g. in grid view).
+    var isInteractive: Bool = true
+
+    /// Snapshot of pages re-computed when the document changes.
+    private var pages: [(index: Int, page: PDFPage)] {
+        (0..<document.pageCount).compactMap { i in
+            guard let p = document.page(at: i) else { return nil }
+            return (i, p)
+        }
+    }
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 6) {
-                ForEach(0..<document.pageCount, id: \.self) { index in
-                    if let page = document.page(at: index) {
-                        ThumbnailRowView(
-                            page: page,
-                            pageIndex: index,
-                            isActive: activeTab.currentPageIndex == index
-                        ) {
-                            activeTab.currentPageIndex = index
-                        }
+                ForEach(pages, id: \.page.hashValue) { entry in
+                    ThumbnailRowView(
+                        page: entry.page,
+                        pageIndex: entry.index,
+                        isActive: activeTab.currentPageIndex == entry.index
+                    ) {
+                        guard isInteractive else { return }
+                        activeTab.currentPageIndex = entry.index
                     }
+                    .opacity(isInteractive ? 1 : 0.45)
+                    .allowsHitTesting(isInteractive)
                 }
             }
             .padding(8)
         }
+        // Force re-evaluation when pages are added/removed/reordered
+        .id(document.pageCount)
     }
 }
 
@@ -193,7 +210,8 @@ struct ThumbnailRowView: View {
         .onTapGesture { onTap() }
         .background(isActive ? Color.accentColor.opacity(0.08) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
-        .task(id: pageIndex) {
+        // Re-generate thumbnail whenever the actual page object changes.
+        .task(id: ObjectIdentifier(page)) {
             thumbnail = await Task.detached(priority: .background) {
                 page.thumbnail(of: CGSize(width: 108, height: 140), for: .mediaBox)
             }.value
@@ -375,12 +393,13 @@ struct ThumbnailSidebarView: View {
 
     let document: PDFDocument
     let activeTab: DocumentTab
+    var isInteractive: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Pages")
+                Text(isInteractive ? "Pages" : "Pages (Grid View)")
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -393,9 +412,12 @@ struct ThumbnailSidebarView: View {
 
             Divider()
 
-            ThumbnailListView(document: document, activeTab: activeTab)
+            ThumbnailListView(document: document, activeTab: activeTab,
+                              isInteractive: isInteractive)
         }
         .background(Color(NSColor.windowBackgroundColor))
+        // Force header page count + list to re-evaluate when document is modified
+        .id(activeTab.isModified)
     }
 }
 

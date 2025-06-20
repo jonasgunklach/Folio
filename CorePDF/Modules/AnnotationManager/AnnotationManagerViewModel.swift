@@ -46,11 +46,6 @@ final class AnnotationManagerViewModel {
 
     var strikethroughColor: NSColor
 
-    // MARK: - Freehand Settings
-
-    var freehandColor: NSColor
-    var freehandLineWidth: CGFloat
-
     // MARK: - Stamp Settings
 
     var availableStamps: [StampTemplate] = StampTemplate.defaults
@@ -63,8 +58,6 @@ final class AnnotationManagerViewModel {
         highlightOpacity  = s.highlightOpacity
         underlineColor    = NSColor(s.underlineColor)
         strikethroughColor = NSColor(s.strikethroughColor)
-        freehandColor     = NSColor(s.freehandColor)
-        freehandLineWidth = s.freehandLineWidth
     }
 
     // MARK: - Annotation Application
@@ -97,17 +90,6 @@ final class AnnotationManagerViewModel {
             annotation.color = NSColor.systemBlue
             page.addAnnotation(annotation)
         }
-    }
-
-    /// Adds a freehand ink annotation with the given path.
-    func addFreehandPath(_ path: NSBezierPath, on page: PDFPage) {
-        let bounds = path.bounds.insetBy(dx: -freehandLineWidth, dy: -freehandLineWidth)
-        let annotation = PDFAnnotation(bounds: bounds, forType: .ink, withProperties: nil)
-        annotation.add(path)
-        annotation.color = freehandColor
-        annotation.border = PDFBorder()
-        annotation.border?.lineWidth = freehandLineWidth
-        page.addAnnotation(annotation)
     }
 
     /// Stamps the given page at a coordinate with a text label.

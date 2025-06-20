@@ -30,6 +30,12 @@ struct CorePDFApp: App {
     @State private var appState = AppState()
     private let settings = SettingsStore.shared
 
+    init() {
+        // Disable macOS automatic window tab bar so our custom tab system
+        // is the sole tab UI and "Show Tab Bar" never appears in the menu.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -43,6 +49,13 @@ struct CorePDFApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open PDF\u{2026}") { appState.isFileImporterPresented = true }
                     .keyboardShortcut("o")
+                Button("New Empty Document") { appState.openEmptyDocument() }
+                    .keyboardShortcut("n")
+                Menu("New Tab") {
+                    Button("Open PDF\u{2026}") { appState.isFileImporterPresented = true }
+                    Button("New Empty Document") { appState.openEmptyDocument() }
+                }
+                .keyboardShortcut("t")
             }
 
             CommandGroup(after: .newItem) {

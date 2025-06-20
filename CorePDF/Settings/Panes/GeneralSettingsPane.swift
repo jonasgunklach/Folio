@@ -16,6 +16,8 @@ struct GeneralSettingsPane: View {
             // ── Appearance ────────────────────────────────────────────
             Section("Appearance") {
                 AppearancePicker(selection: $settings.appearanceMode)
+                Divider().padding(.vertical, 4)
+                TabBarStylePicker(selection: $settings.tabBarStyle)
             }
 
             // ── On Launch ────────────────────────────────────────────
@@ -129,5 +131,113 @@ private struct AppearanceCard: View {
         case .light:  Color.gray.opacity(0.4)
         case .dark:   Color.white.opacity(0.25)
         }
+    }
+}
+
+// MARK: - Tab Bar Style Picker (card-style, mirrors AppearancePicker)
+
+private struct TabBarStylePicker: View {
+
+    @Binding var selection: TabBarStyle
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ForEach(TabBarStyle.allCases) { style in
+                TabBarStyleCard(style: style, isSelected: selection == style)
+                    .onTapGesture { selection = style }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct TabBarStyleCard: View {
+
+    let style: TabBarStyle
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(NSColor.windowBackgroundColor))
+                    .frame(width: 88, height: 60)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(isSelected ? Color.accentColor : Color.gray.opacity(0.3),
+                                          lineWidth: isSelected ? 2 : 1)
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+
+                VStack(spacing: 0) {
+                    // Toolbar strip
+                    ZStack {
+                        Color(NSColor.controlBackgroundColor)
+                        if style == .toolbar {
+                            // Tab pills sit inside the toolbar
+                            HStack(spacing: 3) {
+                                Capsule()
+                                    .fill(Color.accentColor.opacity(0.7))
+                                    .frame(width: 18, height: 5)
+                                Capsule()
+                                    .fill(Color.gray.opacity(0.35))
+                                    .frame(width: 14, height: 5)
+                                Capsule()
+                                    .fill(Color.gray.opacity(0.35))
+                                    .frame(width: 14, height: 5)
+                            }
+                        }
+                    }
+                    .frame(height: 16)
+
+                    // Dedicated tab bar strip (only in .bar style)
+                    if style == .bar {
+                        ZStack {
+                            Color(NSColor.windowBackgroundColor).opacity(0.85)
+                            HStack(spacing: 3) {
+                                Capsule()
+                                    .fill(Color.accentColor.opacity(0.7))
+                                    .frame(width: 18, height: 4)
+                                Capsule()
+                                    .fill(Color.gray.opacity(0.35))
+                                    .frame(width: 14, height: 4)
+                            }
+                        }
+                        .frame(height: 10)
+                    }
+
+                    // Content area
+                    VStack(spacing: 3) {
+                        Capsule()
+                            .fill(Color(NSColor.secondaryLabelColor).opacity(0.35))
+                            .frame(width: 50, height: 3)
+                        Capsule()
+                            .fill(Color(NSColor.secondaryLabelColor).opacity(0.35))
+                            .frame(width: 40, height: 3)
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                if isSelected {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.white, Color.accentColor)
+                                .font(.system(size: 14))
+                                .offset(x: 6, y: -6)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+            .frame(width: 88, height: 60)
+
+            Text(style.rawValue)
+                .font(.caption)
+                .foregroundStyle(isSelected ? .primary : .secondary)
+        }
+        .contentShape(Rectangle())
     }
 }

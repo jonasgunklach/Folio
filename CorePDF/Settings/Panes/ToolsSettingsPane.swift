@@ -10,21 +10,17 @@ struct ToolsSettingsPane: View {
 
     @Environment(SettingsStore.self) private var settings
 
-    /// Tools that can be toggled in the toolbar (all except non-primary ones like stamp/signature).
     private let configurableTools: [ActiveTool] = [
-        .select, .highlight, .underline, .strikethrough, .freehand, .text
+        .select, .highlight, .underline, .strikethrough, .text, .signature
     ]
 
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section {
-                Text("Choose which tools appear in the annotation toolbar. At least one tool must remain visible.")
+            Section("Toolbar Tools") {
+                Text("Choose which tools appear in the annotation toolbar.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-
-            Section("Toolbar Tools") {
                 ForEach(configurableTools) { tool in
                     let isOn = Binding<Bool>(
                         get: { settings.visibleTools.contains(tool) },
@@ -32,7 +28,6 @@ struct ToolsSettingsPane: View {
                             if newValue {
                                 settings.visibleTools.insert(tool)
                             } else {
-                                // Always keep at least one tool visible
                                 guard settings.visibleTools.count > 1 else { return }
                                 settings.visibleTools.remove(tool)
                             }
@@ -43,17 +38,24 @@ struct ToolsSettingsPane: View {
                             .symbolRenderingMode(.multicolor)
                             .frame(width: 22)
                         Toggle(tool.rawValue, isOn: isOn)
+                        Spacer()
+                        if let key = tool.keyboardShortcut {
+                            Text(key)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(NSColor.controlBackgroundColor))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .strokeBorder(.separator, lineWidth: 0.5)
+                                        )
+                                )
+                        }
                     }
                 }
-            }
-
-            Section("Keyboard Shortcuts") {
-                LabeledContent("Select",        value: "E")
-                LabeledContent("Highlight",     value: "H")
-                LabeledContent("Underline",     value: "U")
-                LabeledContent("Strikethrough", value: "K")
-                LabeledContent("Freehand",      value: "F")
-                LabeledContent("Text Box",      value: "T")
             }
         }
         .formStyle(.grouped)
