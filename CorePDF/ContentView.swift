@@ -37,15 +37,20 @@ struct ContentView: View {
     private var tab: DocumentTab? { appState.activeTab }
     private var hasDoc: Bool { tab != nil }
 
+    /// Persisted sidebar width, clamped to [120, 400]
+    @State private var sidebarWidth: CGFloat = 180
+
     var body: some View {
         HStack(spacing: 0) {
             // ── Thumbnail sidebar ──────────────────────────────────────
             if appState.isSidebarVisible, let tab {
                 ThumbnailSidebarView(document: tab.document, activeTab: tab,
                                      isInteractive: tab.viewMode == .scroll)
-                    .frame(width: 200)
+                    .frame(width: sidebarWidth)
                     .transition(.move(edge: .leading).combined(with: .opacity))
-                Divider()
+
+                // Drag handle
+                SidebarResizeHandle(width: $sidebarWidth)
             }
 
             // ── Main content area ──────────────────────────────────────
@@ -64,6 +69,20 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        // ── Hidden keyboard shortcuts for annotation tools ────────────
+        // Kept in the view body (not in the toolbar) so they don't pollute
+        // the toolbar overflow menu item labels.
+        .background {
+            Group {
+                Button("") { if hasDoc { appState.activeTool = .select }        }.keyboardShortcut("e", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .highlight }     }.keyboardShortcut("h", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .underline }     }.keyboardShortcut("u", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .strikethrough } }.keyboardShortcut("k", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .text }          }.keyboardShortcut("c", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .signature }     }.keyboardShortcut("g", modifiers: [])
+            }
+            .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isSidebarVisible)
         // ── Tab bar row (pinned below toolbar when style == .bar) ─────
@@ -169,49 +188,38 @@ struct ContentView: View {
                 .fixedSize()
                 .disabled(!hasDoc || tab?.viewMode == .grid)
                 .help("Annotation Tools")
-                .background {
-                    Group {
-                        Button("") { if hasDoc { appState.activeTool = .select }       }.keyboardShortcut("e", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .highlight }    }.keyboardShortcut("h", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .underline }    }.keyboardShortcut("u", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .strikethrough }}.keyboardShortcut("k", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .text }         }.keyboardShortcut("c", modifiers: [])
-                        Button("") { if hasDoc { appState.activeTool = .signature }    }.keyboardShortcut("g", modifiers: [])
-                    }
-                    .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
-                }
             }
 
             // ── Right group 2: Zoom ───────────────────────────────────
+            // ── Right group 2: Zoom ────────────────────────────────────────────
+            // Menu collapses to a proper "Zoom" submenu in overflow, matching
+            // the reading-mode pattern. Shows current scale in the label.
             ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 0) {
-                    Button { tab?.viewerViewModel.zoomOut() } label: {
-                        Image(systemName: "minus")
-                            .frame(width: 20, height: 22)
-                    }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Zoom Out (⌘−)")
-
-                    Button { tab?.viewerViewModel.zoomToFit() } label: {
-                        Text(tab.map {
-                            String(format: "%.0f%%", $0.viewerViewModel.scaleFactor * 100)
-                        } ?? "—")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .frame(minWidth: 36, alignment: .center)
-                    }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Actual Size (⌘0)")
-
+                Menu {
                     Button { tab?.viewerViewModel.zoomIn() } label: {
-                        Image(systemName: "plus")
-                            .frame(width: 20, height: 22)
+                        Label("Zoom In", systemImage: "plus.magnifyingglass")
                     }
-                    .disabled(!hasDoc || tab?.viewMode == .grid)
-                    .help("Zoom In (⌘=)")
+                    Button { tab?.viewerViewModel.zoomOut() } label: {
+                        Label("Zoom Out", systemImage: "minus.magnifyingglass")
+                    }
+                    Divider()
+                    Button { tab?.viewerViewModel.zoomToFit() } label: {
+                        Label("Actual Size", systemImage: "1.magnifyingglass")
+                    }
+                } label: {
+                    Label(
+                        tab.map { String(format: "%.0f%%", $0.viewerViewModel.scaleFactor * 100) } ?? "Zoom",
+                        systemImage: "magnifyingglass"
+                    )
+                    .labelStyle(.iconOnly)
                 }
+                .disabled(!hasDoc || tab?.viewMode == .grid)
+                .help("Zoom")
             }
 
             // ── Right group 3 (rightmost): Reading mode ───────────────
+            // Using Label (not bare Image) so NSToolbar can title the overflow
+            // submenu "Reading Mode" instead of flattening the items.
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     ForEach(ReadingMode.allCases) { mode in
@@ -222,8 +230,10 @@ struct ContentView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: tab?.readingMode.symbolName ?? ReadingMode.default.symbolName)
+                    Label("Reading Mode",
+                          systemImage: tab?.readingMode.symbolName ?? ReadingMode.default.symbolName)
                         .symbolRenderingMode(.multicolor)
+                        .labelStyle(.iconOnly)
                 }
                 .disabled(!hasDoc)
                 .help("Reading Mode: \(tab?.readingMode.rawValue ?? "Default")")
@@ -268,3 +278,42 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Sidebar Resize Handle
+
+/// A thin draggable divider that lets the user resize the sidebar.
+/// Shows a resize cursor on hover, just like Finder / Xcode.
+struct SidebarResizeHandle: View {
+
+    @Binding var width: CGFloat
+    @State private var isHovered = false
+    @State private var dragStartWidth: CGFloat = 0
+
+    private let minWidth: CGFloat = 120
+    // 2-column layout starts when availableWidth > 220 (sidebarWidth - 2*12 > 220 → sidebarWidth > 244)
+    private let maxWidth: CGFloat = 244
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(isHovered ? 0.18 : 0.08))
+            .frame(width: 4)
+            .onHover { hovered in
+                isHovered = hovered
+                if hovered {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if value.translation.width == value.translation.width && dragStartWidth == 0 {
+                            dragStartWidth = width
+                        }
+                        let newWidth = dragStartWidth + value.translation.width
+                        width = min(maxWidth, max(minWidth, newWidth))
+                    }
+                    .onEnded { _ in dragStartWidth = 0 }
+            )
+    }
+}

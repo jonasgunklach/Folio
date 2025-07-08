@@ -132,10 +132,8 @@ struct ThumbnailListView: View {
 
     let document: PDFDocument
     let activeTab: DocumentTab
-    /// When false, thumbnails show but tapping them does nothing (e.g. in grid view).
     var isInteractive: Bool = true
 
-    /// Snapshot of pages re-computed when the document changes.
     private var pages: [(index: Int, page: PDFPage)] {
         (0..<document.pageCount).compactMap { i in
             guard let p = document.page(at: i) else { return nil }
@@ -144,76 +142,89 @@ struct ThumbnailListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 6) {
-                ForEach(pages, id: \.page.hashValue) { entry in
-                    ThumbnailRowView(
-                        page: entry.page,
-                        pageIndex: entry.index,
-                        isActive: activeTab.currentPageIndex == entry.index
-                    ) {
-                        guard isInteractive else { return }
-                        activeTab.currentPageIndex = entry.index
+        GeometryReader { geo in
+            let padding: CGFloat = 12
+            let thumbWidth = geo.size.width - padding * 2
+
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(pages, id: \.page.hashValue) { entry in
+                        ThumbnailCardView(
+                            page: entry.page,
+                            pageIndex: entry.index,
+                            thumbWidth: thumbWidth,
+                            isActive: activeTab.currentPageIndex == entry.index
+                        ) {
+                            guard isInteractive else { return }
+                            activeTab.currentPageIndex = entry.index
+                        }
+                        .opacity(isInteractive ? 1 : 0.45)
+                        .allowsHitTesting(isInteractive)
                     }
-                    .opacity(isInteractive ? 1 : 0.45)
-                    .allowsHitTesting(isInteractive)
                 }
+                .padding(padding)
             }
-            .padding(8)
         }
-        // Force re-evaluation when pages are added/removed/reordered
         .id(document.pageCount)
     }
 }
 
-struct ThumbnailRowView: View {
+/// Preview-style thumbnail: image on top, page number centred below.
+struct ThumbnailCardView: View {
 
     let page: PDFPage
     let pageIndex: Int
+    let thumbWidth: CGFloat
     let isActive: Bool
     let onTap: () -> Void
+
     @State private var thumbnail: NSImage?
 
+    // A4-ish aspect ratio; actual page bounds used if available
+    private var aspectRatio: CGFloat {
+        let b = page.bounds(for: .mediaBox)
+        guard b.width > 0, b.height > 0 else { return 1.414 }
+        return b.height / b.width
+    }
+
+    private var thumbHeight: CGFloat { thumbWidth * aspectRatio }
+
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(spacing: 4) {
             ZStack {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(.tertiary)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(NSColor.textBackgroundColor))
 
                 if let thumbnail {
                     Image(nsImage: thumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 } else {
-                    ProgressView().scaleEffect(0.5)
+                    ProgressView().scaleEffect(0.6)
                 }
             }
-            .frame(width: 54, height: 70)
+            .frame(width: thumbWidth, height: thumbHeight)
             .overlay {
-                if isActive {
-                    RoundedRectangle(cornerRadius: 3)
-                        .strokeBorder(Color.accentColor, lineWidth: 2)
-                }
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(
+                        isActive ? Color.accentColor : Color.primary.opacity(0.12),
+                        lineWidth: isActive ? 2 : 0.5
+                    )
             }
-            .shadow(color: .black.opacity(isActive ? 0.18 : 0.06), radius: 3, y: 1)
+            .shadow(color: .black.opacity(isActive ? 0.18 : 0.07), radius: isActive ? 4 : 2, y: 1)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Page \(pageIndex + 1)")
-                    .font(.caption)
-                    .foregroundStyle(isActive ? .primary : .secondary)
-            }
-
-            Spacer()
+            Text("\(pageIndex + 1)")
+                .font(.caption2)
+                .foregroundStyle(isActive ? Color.accentColor : .secondary)
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .background(isActive ? Color.accentColor.opacity(0.08) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-        // Re-generate thumbnail whenever the actual page object changes.
         .task(id: ObjectIdentifier(page)) {
+            let w = thumbWidth * 2  // render @2x for retina
+            let h = thumbHeight * 2
             thumbnail = await Task.detached(priority: .background) {
-                page.thumbnail(of: CGSize(width: 108, height: 140), for: .mediaBox)
+                page.thumbnail(of: CGSize(width: w, height: h), for: .mediaBox)
             }.value
         }
     }

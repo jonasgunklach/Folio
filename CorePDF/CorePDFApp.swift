@@ -41,7 +41,7 @@ struct CorePDFApp: App {
             ContentView()
                 .environment(appState)
                 .environment(settings)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: 620, minHeight: 480)
                 .preferredColorScheme(settings.appearanceMode.colorScheme)
         }
         .commands {
@@ -88,6 +88,17 @@ struct CorePDFApp: App {
                     }
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+                Divider()
+                Button("Scroll View") {
+                    appState.activeTab?.viewMode = .scroll
+                }
+                .keyboardShortcut("1", modifiers: [.command, .shift])
+                .disabled(appState.activeTab == nil)
+                Button("Page Grid") {
+                    appState.activeTab?.viewMode = .grid
+                }
+                .keyboardShortcut("2", modifiers: [.command, .shift])
+                .disabled(appState.activeTab == nil)
             }
 
             // ── Window – Tab switching (⌘1 … ⌘9) ─────────────────────
