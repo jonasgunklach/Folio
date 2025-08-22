@@ -39,6 +39,7 @@ struct ContentView: View {
 
     /// Persisted sidebar width, clamped to [120, 400]
     @State private var sidebarWidth: CGFloat = 180
+    @State private var aiSidebarWidth: CGFloat = 280
 
     var body: some View {
         HStack(spacing: 0) {
@@ -69,6 +70,15 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // ── AI sidebar (right) ─────────────────────────────────────
+            if appState.isAISidebarVisible {
+                SidebarResizeHandle(width: $aiSidebarWidth, flipped: true)
+
+                AIChatSidebarView(document: tab?.document)
+                    .frame(width: aiSidebarWidth)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
         // ── Hidden keyboard shortcuts for annotation tools ────────────
         // Kept in the view body (not in the toolbar) so they don't pollute
@@ -85,6 +95,7 @@ struct ContentView: View {
             .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isSidebarVisible)
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isAISidebarVisible)
         // ── Tab bar row (pinned below toolbar when style == .bar) ─────
         .safeAreaInset(edge: .top, spacing: 0) {
             if settings.tabBarStyle == .bar {
@@ -238,6 +249,19 @@ struct ContentView: View {
                 .disabled(!hasDoc)
                 .help("Reading Mode: \(tab?.readingMode.rawValue ?? "Default")")
             }
+
+            // ── Rightmost: AI Assistant ────────────────────────────────
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                        appState.isAISidebarVisible.toggle()
+                    }
+                } label: {
+                    Label("AI Assistant", systemImage: "sparkles")
+                        .symbolVariant(appState.isAISidebarVisible ? .fill : .none)
+                }
+                .help(appState.isAISidebarVisible ? "Hide AI Assistant" : "Show AI Assistant")
+            }
         }
         .fileImporter(
             isPresented: Binding(
@@ -285,6 +309,8 @@ struct ContentView: View {
 struct SidebarResizeHandle: View {
 
     @Binding var width: CGFloat
+    /// When `true` dragging left increases width (right-sidebar handle).
+    var flipped: Bool = false
     @State private var isHovered = false
     @State private var dragStartWidth: CGFloat = 0
 
@@ -307,11 +333,9 @@ struct SidebarResizeHandle: View {
             .gesture(
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { value in
-                        if value.translation.width == value.translation.width && dragStartWidth == 0 {
-                            dragStartWidth = width
-                        }
-                        let newWidth = dragStartWidth + value.translation.width
-                        width = min(maxWidth, max(minWidth, newWidth))
+                        if dragStartWidth == 0 { dragStartWidth = width }
+                        let delta = flipped ? -value.translation.width : value.translation.width
+                        width = min(maxWidth, max(minWidth, dragStartWidth + delta))
                     }
                     .onEnded { _ in dragStartWidth = 0 }
             )

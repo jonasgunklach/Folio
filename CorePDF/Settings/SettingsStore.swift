@@ -122,6 +122,16 @@ final class SettingsStore {
         }
     }
 
+    // MARK: AI
+
+    var aiProvider: AIProvider = .openAI {
+        didSet { save(aiProvider.rawValue, key: Keys.aiProvider) }
+    }
+
+    var aiModel: String = AIProvider.openAI.defaultModel {
+        didSet { save(aiModel, key: Keys.aiModel) }
+    }
+
     // MARK: - Private Persistence
 
     private func load() {
@@ -141,6 +151,8 @@ final class SettingsStore {
             let tools = raw.compactMap(ActiveTool.init(rawValue:))
             if !tools.isEmpty { visibleTools = Set(tools) }
         }
+        aiProvider = AIProvider(rawValue: d.string(forKey: Keys.aiProvider) ?? "") ?? .openAI
+        aiModel    = d.string(forKey: Keys.aiModel) ?? aiProvider.defaultModel
     }
 
     private func save(_ value: some Any, key: String) {
@@ -175,5 +187,7 @@ final class SettingsStore {
         static let underlineColor           = "settings.underlineColor"
         static let strikethroughColor       = "settings.strikethroughColor"
         static let visibleTools             = "settings.visibleTools"
+        static let aiProvider               = "settings.aiProvider"
+        static let aiModel                  = "settings.aiModel"
     }
 }

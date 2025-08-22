@@ -13,6 +13,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case display     = "Display"
     case annotations = "Annotations"
     case tools       = "Tools"
+    case ai          = "AI"
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .display:     "rectangle.on.rectangle"
         case .annotations: "pencil.and.outline"
         case .tools:       "wrench.and.screwdriver"
+        case .ai:          "sparkles"
         }
     }
 }
@@ -52,6 +54,7 @@ struct SettingsView: View {
         case .display:     DisplaySettingsPane()
         case .annotations: AnnotationsSettingsPane()
         case .tools:       ToolsSettingsPane()
+        case .ai:          AISettingsPane()
         }
     }
 }

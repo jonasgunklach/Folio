@@ -39,6 +39,7 @@ final class AppState {
     // MARK: - UI State
 
     var isSidebarVisible: Bool = SettingsStore.shared.showSidebarByDefault
+    var isAISidebarVisible: Bool = false
     var activeTool: ActiveTool = .select
     var isFileImporterPresented: Bool = false
 
