@@ -172,16 +172,14 @@ struct ContentView: View {
             }
 
             // ── Centre: Tab strip (toolbar style) or invisible anchor (.bar style)
-            // The principal item MUST always contain a non-empty view so that
-            // NSToolbar registers a centred item and inserts the flexible-space
-            // separators that push .navigation items left and .primaryAction right.
             ToolbarItem(placement: .principal) {
                 if settings.tabBarStyle == .toolbar {
                     DocumentTabBar()
                         .frame(minWidth: 300, maxWidth: .infinity)
                 } else {
-                    // Transparent 1-pt anchor — keeps NSToolbar's three-zone layout.
-                    Color.clear.frame(width: 1, height: 1)
+                    // Full-width clear view preserves the three-zone layout
+                    // (nav left / primary right) without visible separator lines.
+                    Color.clear.frame(minWidth: 100, maxWidth: .infinity)
                 }
             }
 
