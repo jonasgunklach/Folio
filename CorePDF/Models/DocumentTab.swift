@@ -119,13 +119,16 @@ final class DocumentTab: Identifiable {
         await performWrite(to: dest, fallbackToPanel: false)
     }
 
-    // Captures document data on the main actor then writes it on a background thread.
+    // Both PDF serialisation and disk write run on a background thread so the
+    // main actor (and UI) are never blocked. PDFDocument.dataRepresentation()
+    // is read-only and thread-safe; nonisolated(unsafe) is the Swift 6
+    // escape hatch for Obj-C types that lack Sendable conformance.
     private func performWrite(to destination: URL, fallbackToPanel: Bool) async {
-        // Serialize the PDF on the main actor (safe — no concurrent mutations here).
-        guard let data = document.dataRepresentation() else { return }
         isSaving = true
         defer { isSaving = false }
+        nonisolated(unsafe) let doc = document
         let success = await Task.detached(priority: .userInitiated) {
+            guard let data = doc.dataRepresentation() else { return false }
             do {
                 try data.write(to: destination, options: .atomic)
                 return true
