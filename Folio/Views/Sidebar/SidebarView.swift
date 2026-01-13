@@ -223,8 +223,9 @@ struct ThumbnailCardView: View {
         .task(id: ObjectIdentifier(page)) {
             let w = thumbWidth * 2  // render @2x for retina
             let h = thumbHeight * 2
+            nonisolated(unsafe) let p = page
             thumbnail = await Task.detached(priority: .background) {
-                page.thumbnail(of: CGSize(width: w, height: h), for: .mediaBox)
+                p.thumbnail(of: CGSize(width: w, height: h), for: .mediaBox)
             }.value
         }
     }

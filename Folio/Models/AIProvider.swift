@@ -40,7 +40,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
     }
 
     /// Keychain service name for this provider's API key.
-    var keychainService: String { "com.corepdf.apikey.\(rawValue.lowercased().replacingOccurrences(of: " ", with: "."))" }
+    var keychainService: String { "com.folio.apikey.\(rawValue.lowercased().replacingOccurrences(of: " ", with: "."))" }
 }
 
 // MARK: - Keychain API Key Store

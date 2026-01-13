@@ -168,8 +168,9 @@ struct DocumentTabItem: View {
         }
         .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isActive)
         .task(id: tab.id) {
+            nonisolated(unsafe) let doc = tab.document
             coverImage = await Task.detached(priority: .utility) {
-                tab.document.page(at: 0)?.thumbnail(of: CGSize(width: 36, height: 44), for: .mediaBox)
+                doc.page(at: 0)?.thumbnail(of: CGSize(width: 36, height: 44), for: .mediaBox)
             }.value
         }
     }

@@ -64,7 +64,6 @@ struct PDFKitView: NSViewRepresentable {
         pdfView.displayDirection = displayDirection
         pdfView.displaysPageBreaks = true
         pdfView.displaysAsBook = false
-        pdfView.enableDataDetectors = true
         pdfView.delegate = context.coordinator
 
         let nc = NotificationCenter.default
@@ -79,8 +78,8 @@ struct PDFKitView: NSViewRepresentable {
         // We monitor mouseUp rather than PDFViewSelectionChanged so the annotation is
         // added exactly once — not on every intermediate drag event.
         context.coordinator.installMouseUpMonitor(for: pdfView)
-        context.coordinator.installCursorMonitor(for: pdfView as! DrawablePDFView)
-        context.coordinator.installCommentAndSignatureMonitor(for: pdfView as! DrawablePDFView)
+        context.coordinator.installCursorMonitor(for: pdfView)
+        context.coordinator.installCommentAndSignatureMonitor(for: pdfView)
 
         applyReadingMode(readingMode, to: pdfView)
         return pdfView
@@ -207,7 +206,7 @@ struct PDFKitView: NSViewRepresentable {
             guard tool == .highlight || tool == .underline || tool == .strikethrough else { return }
 
             // Iterate per-line selections so each annotation covers exactly one line of text
-            let lineSelections = selection.selectionsByLine() ?? [selection]
+            let lineSelections = selection.selectionsByLine()
             for lineSel in lineSelections {
                 for page in lineSel.pages {
                     let bounds = lineSel.bounds(for: page)

@@ -295,8 +295,9 @@ struct PageThumbnailCell: View {
         }
         // Re-generate thumbnail whenever refreshToken changes (rotation, delete, reorder).
         .task(id: refreshToken) {
+            nonisolated(unsafe) let p = page
             thumbnail = await Task.detached(priority: .background) {
-                page.thumbnail(of: CGSize(width: 200, height: 260), for: .mediaBox)
+                p.thumbnail(of: CGSize(width: 200, height: 260), for: .mediaBox)
             }.value
         }
     }
