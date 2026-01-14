@@ -1,7 +1,7 @@
-# CorePDF
+# Folio
 
 <p align="center">
-  <img src="Screenshots/icon.png" width="128" alt="CorePDF icon">
+  <img src="Screenshots/icon.png" width="128" alt="Folio icon">
 </p>
 
 <p align="center">
@@ -125,10 +125,10 @@
 ## Architecture
 
 ```
-CorePDF/
-├── CorePDFApp.swift              # @main — WindowGroup, Settings scene, menu commands
+Folio/
+├── FolioApp.swift                # @main — WindowGroup, Settings scene, menu commands
 ├── ContentView.swift             # Root layout, resizable sidebars, toolbar, file importer
-├── CorePDF.entitlements          # App Sandbox + network.client + user-selected files
+├── Folio.entitlements            # App Sandbox + network.client + user-selected files
 ├── Models/
 │   ├── AppState.swift            # @Observable singleton — tabs, active tool, sidebar flags
 │   ├── DocumentTab.swift         # Per-document state; non-blocking background save
@@ -167,7 +167,7 @@ CorePDF/
 ## Getting Started
 
 1. Clone the repo
-2. Open `CorePDF.xcodeproj` in Xcode 26.4+
+2. Open `Folio.xcodeproj` in Xcode 26.4+
 3. Select your development team in **Signing & Capabilities**
 4. Run on macOS 26 (⌘R)
 
