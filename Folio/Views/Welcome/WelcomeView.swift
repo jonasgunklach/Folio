@@ -23,19 +23,41 @@
 // THE SOFTWARE.
 
 import SwiftUI
+import PDFKit
 import UniformTypeIdentifiers
 
 /// Empty-state drop zone shown when no documents are open.
+/// Top half: drag-and-drop / open button.  Bottom half: recently opened files.
 struct WelcomeView: View {
 
     @Environment(AppState.self) private var appState
     @State private var isDropTargeted = false
 
     var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+
+                // ── Top 50 %: Open a file ──────────────────────────────
+                openSection
+                    .frame(height: geo.size.height / 2)
+
+                Divider()
+
+                // ── Bottom 50 %: Recent files ──────────────────────────
+                recentSection
+                    .frame(height: geo.size.height / 2)
+            }
+        }
+        .background(.background)
+    }
+
+    // MARK: - Open section
+
+    private var openSection: some View {
         VStack(spacing: 20) {
             Image(systemName: "doc.viewfinder")
                 .symbolRenderingMode(.multicolor)
-                .font(.system(size: 64))
+                .font(.system(size: 56))
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 6) {
@@ -61,7 +83,6 @@ struct WelcomeView: View {
                 )
                 .padding(32)
         }
-        .background(.background)
         .contentShape(Rectangle())
         .dropDestination(for: URL.self) { urls, _ in
             urls.filter { $0.pathExtension.lowercased() == "pdf" }
@@ -73,4 +94,109 @@ struct WelcomeView: View {
             }
         }
     }
+
+    // MARK: - Recent files section
+
+    private var recentSection: some View {
+        let recent = SettingsStore.shared.recentFileURLs
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Recent Files")
+                .font(.headline)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+
+            if recent.isEmpty {
+                Spacer()
+                Text("No recently opened files")
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 14) {
+                        ForEach(recent, id: \.self) { url in
+                            RecentFileCard(url: url) {
+                                appState.openDocument(at: url)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
 }
+
+// MARK: - Recent file card
+
+private struct RecentFileCard: View {
+    let url: URL
+    let action: () -> Void
+
+    @State private var thumbnail: NSImage?
+    @State private var isHovered = false
+
+    private var displayName: String {
+        url.deletingPathExtension().lastPathComponent
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                // Thumbnail frame
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.08))
+
+                    if let thumb = thumbnail {
+                        Image(nsImage: thumb)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 96, height: 124)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isHovered ? Color.accentColor : Color.secondary.opacity(0.25),
+                                lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+
+                // File name
+                Text(displayName)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: 96, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
+        .onHover { isHovered = $0 }
+        .task(id: url) {
+            thumbnail = await makeThumbnail(for: url)
+        }
+    }
+
+    private func makeThumbnail(for url: URL) async -> NSImage? {
+        await Task.detached(priority: .utility) {
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            guard let doc = PDFDocument(url: url),
+                  let page = doc.page(at: 0) else { return nil }
+            return page.thumbnail(of: CGSize(width: 192, height: 248), for: .mediaBox)
+        }.value
+    }
+}
+

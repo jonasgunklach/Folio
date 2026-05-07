@@ -79,6 +79,14 @@ struct ContentView: View {
                     .frame(width: aiSidebarWidth)
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
+
+            // ── Content Editor panel (right) ──────────────────────────
+            if appState.isContentEditorVisible, let tab {
+                Divider()
+                ContentEditorView(tab: tab)
+                    .frame(width: 300)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
         // ── Hidden keyboard shortcuts for annotation tools ────────────
         // Kept in the view body (not in the toolbar) so they don't pollute
@@ -86,16 +94,20 @@ struct ContentView: View {
         .background {
             Group {
                 Button("") { if hasDoc { appState.activeTool = .select }        }.keyboardShortcut("e", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .markup }         }.keyboardShortcut("m", modifiers: [])
                 Button("") { if hasDoc { appState.activeTool = .highlight }     }.keyboardShortcut("h", modifiers: [])
                 Button("") { if hasDoc { appState.activeTool = .underline }     }.keyboardShortcut("u", modifiers: [])
                 Button("") { if hasDoc { appState.activeTool = .strikethrough } }.keyboardShortcut("k", modifiers: [])
                 Button("") { if hasDoc { appState.activeTool = .text }          }.keyboardShortcut("c", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .addText }       }.keyboardShortcut("t", modifiers: [])
+                Button("") { if hasDoc { appState.activeTool = .shape }         }.keyboardShortcut("s", modifiers: [])
                 Button("") { if hasDoc { appState.activeTool = .signature }     }.keyboardShortcut("g", modifiers: [])
             }
             .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
         }
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isSidebarVisible)
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isAISidebarVisible)
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isContentEditorVisible)
         // ── Tab bar row (pinned below toolbar when style == .bar) ─────
         .safeAreaInset(edge: .top, spacing: 0) {
             if settings.tabBarStyle == .bar {
@@ -248,15 +260,38 @@ struct ContentView: View {
                 .help("Reading Mode: \(tab?.readingMode.rawValue ?? "Default")")
             }
 
+            // ── Edit Content toggle ────────────────────────────────────
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                        let opening = !appState.isContentEditorVisible
+                        appState.isContentEditorVisible = opening
+                        if opening { appState.isAISidebarVisible = false }
+                    }
+                } label: {
+                    Image(systemName: appState.isContentEditorVisible
+                          ? "pencil.and.ruler.fill" : "pencil.and.ruler")
+                        .font(.system(size: 14))
+                        .foregroundStyle(appState.isContentEditorVisible
+                                         ? Color.accentColor : Color.primary)
+                }
+                .disabled(!hasDoc)
+                .help(appState.isContentEditorVisible ? "Hide Content Editor" : "Insert Images & Edit Content")
+            }
+
             // ── Rightmost: AI Assistant ────────────────────────────────
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
-                        appState.isAISidebarVisible.toggle()
+                        let opening = !appState.isAISidebarVisible
+                        appState.isAISidebarVisible = opening
+                        if opening { appState.isContentEditorVisible = false }
                     }
                 } label: {
-                    Label("AI Assistant", systemImage: "sparkles")
-                        .symbolVariant(appState.isAISidebarVisible ? .fill : .none)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14))
+                        .foregroundStyle(appState.isAISidebarVisible
+                                         ? Color.accentColor : Color.primary)
                 }
                 .help(appState.isAISidebarVisible ? "Hide AI Assistant" : "Show AI Assistant")
             }

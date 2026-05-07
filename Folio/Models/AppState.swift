@@ -40,6 +40,7 @@ final class AppState {
 
     var isSidebarVisible: Bool = SettingsStore.shared.showSidebarByDefault
     var isAISidebarVisible: Bool = false
+    var isContentEditorVisible: Bool = false
     var activeTool: ActiveTool = .select
     var isFileImporterPresented: Bool = false
 
@@ -71,6 +72,7 @@ final class AppState {
         let tab = DocumentTab(document: document, url: url, securityScopeActive: accessed)
         tabs.append(tab)
         activeTabID = tab.id
+        SettingsStore.shared.addRecentFile(url)
     }
 
     /// Creates a new empty single-page PDF document in a new tab.

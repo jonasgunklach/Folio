@@ -72,6 +72,16 @@ struct FolioApp: App {
                     .disabled(!(appState.activeTab?.isModified ?? false) || (appState.activeTab?.isSaving ?? false))
             }
 
+            // ── Edit – Undo / Redo ─────────────────────────────────────
+            CommandGroup(replacing: .undoRedo) {
+                Button("Undo") { appState.activeTab?.undoManager.undo() }
+                    .keyboardShortcut("z", modifiers: .command)
+                    .disabled(!(appState.activeTab?.undoManager.canUndo ?? false))
+                Button("Redo") { appState.activeTab?.undoManager.redo() }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled(!(appState.activeTab?.undoManager.canRedo ?? false))
+            }
+
             // ── View – Zoom ───────────────────────────────────────────
             CommandGroup(after: .toolbar) {
                 Divider()

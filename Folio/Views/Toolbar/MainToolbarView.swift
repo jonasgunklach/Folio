@@ -100,11 +100,9 @@ struct MainToolbarView: View {
 
             tbSep
 
-            // ── Text markup ───────────────────────────────────────────
+            // ── Text markup (unified) ──────────────────────────────────
             HStack(spacing: 2) {
-                toolBtn(.highlight)
-                toolBtn(.underline)
-                toolBtn(.strikethrough)
+                toolBtn(.markup)
             }
 
             tbSep
@@ -112,6 +110,7 @@ struct MainToolbarView: View {
             // ── Text / Drawing ────────────────────────────────────────
             HStack(spacing: 2) {
                 toolBtn(.text)
+                toolBtn(.addText)
             }
 
             tbSep

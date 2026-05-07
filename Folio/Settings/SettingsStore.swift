@@ -115,7 +115,7 @@ final class SettingsStore {
     // MARK: Tools
 
     /// The annotation tools visible in the toolbar segmented picker.
-    var visibleTools: Set<ActiveTool> = [.select, .highlight, .underline, .strikethrough, .text, .signature] {
+    var visibleTools: Set<ActiveTool> = [.select, .markup, .text, .addText, .shape, .signature] {
         didSet {
             let raw = visibleTools.map(\.rawValue)
             UserDefaults.standard.set(raw, forKey: Keys.visibleTools)
@@ -130,6 +130,48 @@ final class SettingsStore {
 
     var aiModel: String = AIProvider.openAI.defaultModel {
         didSet { save(aiModel, key: Keys.aiModel) }
+    }
+
+    // MARK: Recent Files
+
+    /// Returns the most-recently-opened PDF URLs resolved from stored security-scoped bookmarks.
+    /// Stale / unresolvable bookmarks are silently skipped.
+    var recentFileURLs: [URL] {
+        let bookmarks = (UserDefaults.standard.array(forKey: Keys.recentFiles) as? [Data]) ?? []
+        return bookmarks.compactMap { data in
+            var stale = false
+            return try? URL(resolvingBookmarkData: data,
+                            options: .withSecurityScope,
+                            relativeTo: nil,
+                            bookmarkDataIsStale: &stale)
+        }
+    }
+
+    /// Persists `url` as a security-scoped bookmark at the front of the recent-files list.
+    /// Duplicate entries are deduplicated; the list is capped at 12.
+    func addRecentFile(_ url: URL) {
+        // NOTE: Do NOT pass `.securityScopeAllowOnlyReadAccess` – we need
+        // read+write so that re-opened recent files can also be saved.
+        guard let bookmarkData = try? url.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) else { return }
+
+        var bookmarks = (UserDefaults.standard.array(forKey: Keys.recentFiles) as? [Data]) ?? []
+        // Remove any existing entry for the same file
+        bookmarks = bookmarks.filter { data in
+            var stale = false
+            guard let existing = try? URL(resolvingBookmarkData: data,
+                                          options: .withSecurityScope,
+                                          relativeTo: nil,
+                                          bookmarkDataIsStale: &stale)
+            else { return false }
+            return existing.standardizedFileURL != url.standardizedFileURL
+        }
+        bookmarks.insert(bookmarkData, at: 0)
+        if bookmarks.count > 12 { bookmarks = Array(bookmarks.prefix(12)) }
+        UserDefaults.standard.set(bookmarks, forKey: Keys.recentFiles)
     }
 
     // MARK: - Private Persistence
@@ -189,5 +231,6 @@ final class SettingsStore {
         static let visibleTools             = "settings.visibleTools"
         static let aiProvider               = "settings.aiProvider"
         static let aiModel                  = "settings.aiModel"
+        static let recentFiles              = "settings.recentFiles"
     }
 }

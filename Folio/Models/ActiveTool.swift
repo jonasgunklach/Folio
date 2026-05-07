@@ -26,10 +26,13 @@ import Foundation
 
 enum ActiveTool: String, CaseIterable, Identifiable {
     case select         = "Select"
-    case highlight      = "Highlight"
+    case markup         = "Markup"          // highlight / underline / strikethrough group
+    case highlight      = "Highlight"       // kept for internal use / backwards compat
     case strikethrough  = "Strikethrough"
     case underline      = "Underline"
     case text           = "Comment"
+    case addText        = "Text Box"
+    case shape          = "Shape"
     case stamp          = "Stamp"
     case signature      = "Signature"
     case audioNote      = "Audio Note"
@@ -39,10 +42,13 @@ enum ActiveTool: String, CaseIterable, Identifiable {
     var symbolName: String {
         switch self {
         case .select:           "cursorarrow"
+        case .markup:           "highlighter"
         case .highlight:        "a.square.fill"
         case .strikethrough:    "strikethrough"
         case .underline:        "underline"
         case .text:             "bubble.left.fill"
+        case .addText:          "textbox"
+        case .shape:            "square.on.circle"
         case .stamp:            "stamp.fill"
         case .signature:        "signature"
         case .audioNote:        "mic.fill"
@@ -53,10 +59,13 @@ enum ActiveTool: String, CaseIterable, Identifiable {
     var keyboardShortcut: String? {
         switch self {
         case .select:        "E"
+        case .markup:        "M"
         case .highlight:     "H"
         case .underline:     "U"
         case .strikethrough: "K"
         case .text:          "C"
+        case .addText:       "T"
+        case .shape:         "S"
         case .signature:     "G"
         default:             nil
         }
@@ -70,4 +79,9 @@ enum ActiveTool: String, CaseIterable, Identifiable {
     }
 
     var isAnnotationTool: Bool { self != .select }
+
+    /// True for tools that apply text-selection markup (used for cursor + annotation application).
+    var isMarkupTool: Bool {
+        self == .highlight || self == .underline || self == .strikethrough || self == .markup
+    }
 }

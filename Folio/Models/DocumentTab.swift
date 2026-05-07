@@ -35,7 +35,7 @@ import UniformTypeIdentifiers
 final class DocumentTab: Identifiable {
 
     let id: UUID = UUID()
-    let document: PDFDocument
+    var document: PDFDocument
     let url: URL?
     private let securityScopeActive: Bool
 
@@ -53,6 +53,10 @@ final class DocumentTab: Identifiable {
 
     /// Owns annotation tool settings (colors, opacity).
     let annotationViewModel: AnnotationManagerViewModel = AnnotationManagerViewModel()
+
+    /// Per-document undo manager. Populated by PDFKitView coordinator whenever
+    /// annotations are added or removed so Cmd+Z / Cmd+Shift+Z work per-tab.
+    let undoManager: UndoManager = UndoManager()
 
     init(document: PDFDocument, url: URL? = nil, securityScopeActive: Bool = false) {
         self.document = document
@@ -92,6 +96,13 @@ final class DocumentTab: Identifiable {
         }
     }
 
+    /// Reloads the PDFDocument from disk after an external write (e.g. MuPDF image insertion).
+    /// The security scope is assumed to still be active on `url`.
+    func reloadFromDisk() {
+        guard let url, let reloaded = PDFDocument(url: url) else { return }
+        document = reloaded
+    }
+
     // MARK: - Persistence
 
     /// Saves to the original URL, or presents an NSSavePanel if unavailable.
@@ -125,17 +136,27 @@ final class DocumentTab: Identifiable {
     // escape hatch for Obj-C types that lack Sendable conformance.
     private func performWrite(to destination: URL, fallbackToPanel: Bool) async {
         isSaving = true
-        defer { isSaving = false }
         nonisolated(unsafe) let doc = document
+        // Capture before entering the detached task so the scope is held.
+        let accessing = destination.startAccessingSecurityScopedResource()
         let success = await Task.detached(priority: .userInitiated) {
+            defer { if accessing { destination.stopAccessingSecurityScopedResource() } }
             guard let data = doc.dataRepresentation() else { return false }
+            // In the macOS App Sandbox the user-selected file grant covers the
+            // SINGLE file the user opened, not its parent directory. Any path
+            // that creates a sibling temp file (`.atomic`, `replaceItem`, etc.)
+            // fails with EPERM in places like ~/Downloads. Plain `write(to:)`
+            // opens the existing file for O_WRONLY|O_TRUNC – sandbox-OK.
             do {
-                try data.write(to: destination, options: .atomic)
+                try data.write(to: destination)
                 return true
             } catch {
                 return false
             }
         }.value
+        // Reset isSaving BEFORE potentially calling saveWithPanel, otherwise
+        // saveWithPanel's guard !isSaving check exits immediately.
+        isSaving = false
         if success {
             isModified = false
         } else if fallbackToPanel {

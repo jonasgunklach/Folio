@@ -24,53 +24,71 @@
 
 import SwiftUI
 import PDFKit
+import UniformTypeIdentifiers
+import MuPDFKit
 
-/// Inspector panel for direct content editing operations (text, images, links).
-/// Presented as a sheet or sidebar panel in a future iteration.
+/// Inspector panel for direct PDF text editing backed by MuPDF.
 struct ContentEditorView: View {
 
     var tab: DocumentTab
     @State private var viewModel = ContentEditorViewModel()
-    @State private var linkURL: String = ""
+    @State private var extractedLines: [PDFTextLine] = []
+    @State private var selectedLine: PDFTextLine?
+    @State private var editingText: String = ""
+    @State private var lastSuccessMessage: String?
 
     var body: some View {
         Form {
-            Section("Text Editing") {
-                LabeledContent("Status") {
-                    Text("Core Text pipeline — coming soon")
-                        .foregroundStyle(.secondary)
+            // ── Text editing ─────────────────────────────────────────────────
+            Section("Edit Text") {
+                Button("Load Text Lines from Page \(tab.currentPageIndex + 1)") {
+                    extractText()
+                }
+                .disabled(viewModel.isWorking || tab.url == nil)
+
+                if viewModel.isWorking {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Working…").foregroundStyle(.secondary)
+                    }
+                }
+
+                if let msg = lastSuccessMessage {
+                    Label(msg, systemImage: "checkmark.circle")
+                        .foregroundStyle(.green)
                         .font(.caption)
                 }
+
+                if !extractedLines.isEmpty {
+                    Text("Tap a line below to edit it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(extractedLines) { line in
+                        TextLineEditRow(
+                            line: line,
+                            isSelected: selectedLine?.id == line.id,
+                            editingText: $editingText,
+                            onSelect: {
+                                selectedLine = line
+                                editingText = line.text
+                            },
+                            onApply: { applyTextEdit(for: line) },
+                            onCancel: {
+                                selectedLine = nil
+                                editingText = ""
+                            },
+                            isWorking: viewModel.isWorking
+                        )
+                    }
+                }
             }
 
-            Section("Insert Hyperlink") {
-                TextField("https://example.com", text: $linkURL)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Insert on Current Page") {
-                    guard let page = tab.document.page(at: tab.currentPageIndex) else { return }
-                    // TODO: Use a selection rect from the PDF canvas
-                    let placeholderBounds = CGRect(x: 100, y: 100, width: 200, height: 20)
-                    viewModel.insertLink(urlString: linkURL, on: page, bounds: placeholderBounds)
-                    linkURL = ""
-                }
-                .disabled(linkURL.isEmpty)
-            }
-
-            Section("Images") {
-                Button("Extract Images from Page") {
-                    guard let page = tab.document.page(at: tab.currentPageIndex) else { return }
-                    _ = viewModel.extractImages(from: page)
-                }
-
-                Button("Insert Image…") {
-                    // TODO: Drive NSOpenPanel then call viewModel.insertImage
-                }
-            }
-
+            // ── Errors ───────────────────────────────────────────────────────
             if let error = viewModel.lastError {
                 Section {
-                    Text(error.localizedDescription)
+                    Label(error.localizedDescription ?? "Unknown error",
+                          systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                         .font(.caption)
                 }
@@ -78,5 +96,120 @@ struct ContentEditorView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onChange(of: tab.currentPageIndex) {
+            extractedLines = []
+            selectedLine = nil
+            editingText = ""
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func extractText() {
+        guard let fileURL = tab.url else { return }
+        viewModel.extractTextLines(documentURL: fileURL,
+                                   pageIndex: tab.currentPageIndex) { lines in
+            extractedLines = lines
+            selectedLine = nil
+            editingText = ""
+            lastSuccessMessage = nil
+        }
+    }
+
+    private func applyTextEdit(for line: PDFTextLine) {
+        guard let fileURL = tab.url else { return }
+        let rect = CGRect(x: line.x, y: line.y, width: line.width, height: line.height)
+        let newText = editingText
+        lastSuccessMessage = nil
+        viewModel.replaceText(newText,
+                              documentURL: fileURL,
+                              pageIndex: tab.currentPageIndex,
+                              rect: rect,
+                              fontName: line.fontName,
+                              fontSize: line.fontSize,
+                              colorR: line.colorR,
+                              colorG: line.colorG,
+                              colorB: line.colorB) { pdfData in
+            // Load the MuPDF-modified bytes into PDFKit so the view refreshes.
+            if let newDoc = PDFDocument(data: pdfData) {
+                tab.document = newDoc
+            }
+
+            // Write the exact MuPDF bytes directly to disk in a background task
+            // (bypasses PDFKit's dataRepresentation() so no round-trip risk).
+            // If the write fails (e.g. old read-only bookmark), isModified stays
+            // true and the user can File > Save As.
+            tab.isModified = true
+            Task.detached(priority: .userInitiated) {
+                let accessing = fileURL.startAccessingSecurityScopedResource()
+                defer { if accessing { fileURL.stopAccessingSecurityScopedResource() } }
+                if (try? pdfData.write(to: fileURL)) != nil {
+                    await MainActor.run { tab.isModified = false }
+                }
+                // On failure: tab.isModified stays true → Cmd+S → NSSavePanel.
+            }
+
+            // Optimistically update the text line in the sidebar list so the
+            // user sees their edit immediately without re-reading from disk.
+            extractedLines = extractedLines.map { l in
+                guard l.id == line.id else { return l }
+                return PDFTextLine(text: newText,
+                                   x: l.x, y: l.y, width: l.width, height: l.height,
+                                   fontName: l.fontName, fontSize: l.fontSize,
+                                   colorR: l.colorR, colorG: l.colorG, colorB: l.colorB)
+            }
+            selectedLine = nil
+            editingText = ""
+            lastSuccessMessage = "Text updated."
+        }
+    }
+}
+
+// MARK: - Text line edit row
+
+private struct TextLineEditRow: View {
+    let line: PDFTextLine
+    let isSelected: Bool
+    @Binding var editingText: String
+    let onSelect: () -> Void
+    let onApply: () -> Void
+    let onCancel: () -> Void
+    let isWorking: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button(action: onSelect) {
+                HStack {
+                    Text(line.text)
+                        .font(.caption)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if isSelected {
+                        Image(systemName: "pencil.circle.fill")
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(6)
+            .background(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            if isSelected {
+                TextField("Replacement text…", text: $editingText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+
+                HStack {
+                    Button("Apply", action: onApply)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(editingText.isEmpty || isWorking)
+
+                    Button("Cancel", action: onCancel)
+                        .controlSize(.small)
+                }
+            }
+        }
     }
 }

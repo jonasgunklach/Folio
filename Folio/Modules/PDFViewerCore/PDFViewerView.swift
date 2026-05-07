@@ -31,6 +31,7 @@ struct PDFViewerView: View {
 
     var tab: DocumentTab
     @Environment(AppState.self) private var appState
+    @State private var contentEditorVM = ContentEditorViewModel()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -52,22 +53,49 @@ struct PDFViewerView: View {
                 underlineColor: tab.annotationViewModel.underlineColor,
                 strikethroughColor: tab.annotationViewModel.strikethroughColor,
                 annotationOpacity: tab.annotationViewModel.highlightOpacity,
-                onAnnotationAdded: { tab.isModified = true }
+                annotationViewModel: tab.annotationViewModel,
+                onAnnotationAdded: { tab.isModified = true },
+                undoManager: tab.undoManager,
+                onPlacementDone: {
+                    appState.activeTool = .select
+                },
+                onImageDropped: nil
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Annotation colour/settings palette — appears when annotation tool is active
-            if appState.activeTool.isAnnotationTool {
+            // Annotation colour/settings palette — appears when an annotation tool
+            // is active, OR when a shape annotation is selected in select mode.
+            if let paletteTool = effectivePaletteTool {
                 AnnotationToolPaletteView(
                     viewModel: tab.annotationViewModel,
-                    activeTool: appState.activeTool
+                    activeTool: paletteTool
                 )
                 .padding(.bottom, 16)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.8), value: appState.activeTool)
+        .onChange(of: appState.activeTool) {
+            // Clear shape selection when the user switches away from select tool
+            // so the palette hides and the next tool starts fresh.
+            if appState.activeTool != .select {
+                tab.annotationViewModel.deselectAnnotation()
+            }
+        }
         .onDisappear { tab.viewerViewModel.stopTTS() }
     }
-}
 
+    /// The tool to use for the floating palette, or nil when the palette should be hidden.
+    private var effectivePaletteTool: ActiveTool? {
+        if appState.activeTool.isAnnotationTool { return appState.activeTool }
+        // In select mode, show the shape palette when a shape annotation is selected.
+        if appState.activeTool == .select,
+           let ann = tab.annotationViewModel.selectedAnnotation {
+            switch ann.type {
+            case "Square", "Circle", "Line": return .shape
+            default: break
+            }
+        }
+        return nil
+    }
+}
