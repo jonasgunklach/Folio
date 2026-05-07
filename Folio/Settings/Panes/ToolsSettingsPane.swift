@@ -11,7 +11,7 @@ struct ToolsSettingsPane: View {
     @Environment(SettingsStore.self) private var settings
 
     private let configurableTools: [ActiveTool] = [
-        .select, .highlight, .underline, .strikethrough, .text, .signature
+        .select, .markup, .text, .addText, .shape, .stamp, .signature, .audioNote
     ]
 
     var body: some View {

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A native macOS PDF editor built with SwiftUI, PDFKit, and the Swift Observation framework.<br>
+  A native macOS PDF editor built with SwiftUI, PDFKit, MuPDFKit, and the Swift Observation framework.<br>
   Designed to feel at home on macOS 26 with a Liquid Glass toolbar aesthetic.
 </p>
 
@@ -48,14 +48,16 @@
 | Tool | Shortcut | Description |
 |------|----------|-------------|
 | Select | E | Move/resize existing annotations |
-| Highlight | H | Colour highlight over selected text |
-| Underline | U | Underline selected text |
-| Strikethrough | K | Strikethrough selected text |
-| Text / Comment | C | Click to place a text-box annotation |
+| Markup | M | Grouped picker for highlight, underline, and strikethrough |
+| Comment | C | Click to place a speech-bubble annotation |
+| Text Box | T | Click to insert an editable, resizable text box |
+| Shape | S | Draw rectangle, ellipse, or line overlay annotations |
+| Stamp | — | Apply pre-defined or custom PDF stamps |
 | Signature | G | Draw a freehand signature; resizable via PDFKit handles |
+| Audio Note | — | Embed a voice-recording annotation |
 
-- Per-tool colours and opacity configurable in **Settings → Annotations**
-- Choose which tools appear in the toolbar in **Settings → Tools**
+- Highlight · underline · strikethrough colours and opacity configurable in **Settings → Annotations**
+- Choose which tools are visible in the toolbar in **Settings → Tools**
 
 ### Page Organizer (Grid View)
 - Full-document grid with page thumbnails and page numbers
@@ -106,10 +108,10 @@
 | Page Grid | ⌘⇧2 |
 | Zoom In / Out / Actual | ⌘= / ⌘− / ⌘0 |
 | Select tool | E |
-| Highlight | H |
-| Underline | U |
-| Strikethrough | K |
-| Text / Comment | C |
+| Markup (highlight / underline / strikethrough) | M |
+| Comment | C |
+| Text Box | T |
+| Shape | S |
 | Signature | G |
 | Settings | ⌘, |
 
@@ -141,6 +143,8 @@ Folio/
 ├── Modules/
 │   ├── PDFViewerCore/            # NSViewRepresentable PDFView bridge, zoom VM, cursor monitors
 │   ├── AnnotationManager/        # Annotation VM + floating colour/opacity palette
+│   ├── ContentEditor/            # Direct PDF text editing via MuPDF (extract + rewrite text lines)
+│   ├── DocumentIntelligence/     # OCR (Vision), scan enhancement (CoreImage), summarisation
 │   ├── PageOrganizer/            # Grid reorder view + VM (copy/paste/add-empty/rotate/delete)
 │   └── FormsAndSignatures/       # Signature canvas + PDFKit freeText annotation commit
 ├── Views/
@@ -152,6 +156,9 @@ Folio/
     ├── SettingsStore.swift        # @Observable UserDefaults-backed preferences
     ├── SettingsView.swift         # TabView shell with icon strip
     └── Panes/                     # General · Display · Annotations · Tools · AI
+MuPDFKit/                          # Local Swift package wrapping libmupdf (C) via SPM
+├── Sources/MuPDFCore/             # C bridging layer + prebuilt static libraries (.a)
+└── Sources/MuPDFKit/              # Swift API — MuPDFEngine (text extraction & rewriting)
 ```
 
 **Key patterns:**
