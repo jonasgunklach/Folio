@@ -111,6 +111,7 @@ struct MainToolbarView: View {
             HStack(spacing: 2) {
                 toolBtn(.text)
                 toolBtn(.addText)
+                toolBtn(.editText)
             }
 
             tbSep

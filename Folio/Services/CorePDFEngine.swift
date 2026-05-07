@@ -205,17 +205,28 @@ final class CorePDFDocument {
                 NSAttributedString.Key(kCTForegroundColorAttributeName as String): cgColor
             ]
             let attrStr = NSAttributedString(string: capturedText, attributes: ctAttrs)
-            let line    = CTLineCreateWithAttributedString(attrStr)
-            // Reset text matrix — required in PDF CGContexts to avoid inheriting
-            // a stale transform from drawPDFPage.
-            ctx.textMatrix = .identity
-            // Place the baseline using the font's actual descent metric so the
-            // replacement text sits at the same vertical position as the original.
-            // CTFontGetDescent returns a positive value (distance below baseline).
-            let descent = CTFontGetDescent(ctFont)
-            ctx.textPosition = CGPoint(x: capturedRect.minX,
-                                       y: capturedRect.minY + descent)
-            CTLineDraw(line, ctx)
+
+            // Use CTFramesetter (word-wrapping) when the target rect is tall enough
+            // to hold multiple lines — i.e. it was originally a paragraph.
+            // For single-line rects, CTLineDraw is sufficient.
+            let isMultiLine = capturedRect.height > capturedSize * 1.8
+            if isMultiLine {
+                let framesetter = CTFramesetterCreateWithAttributedString(attrStr)
+                let path  = CGPath(rect: capturedRect, transform: nil)
+                let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(0, 0), path, nil)
+                CTFrameDraw(frame, ctx)
+            } else {
+                let line = CTLineCreateWithAttributedString(attrStr)
+                // Reset text matrix — required in PDF CGContexts to avoid inheriting
+                // a stale transform from drawPDFPage.
+                ctx.textMatrix = .identity
+                // Place the baseline using the font's actual descent metric so the
+                // replacement text sits at the same vertical position as the original.
+                let descent = CTFontGetDescent(ctFont)
+                ctx.textPosition = CGPoint(x: capturedRect.minX,
+                                           y: capturedRect.minY + descent)
+                CTLineDraw(line, ctx)
+            }
             ctx.restoreGState()
         }
         pageMutations[pageIndex, default: []].append(textMutation)
@@ -361,29 +372,52 @@ final class CorePDFDocument {
             return ys[ys.count / 2]
         }
 
-        func flushBucket() {
-            guard !bucket.isEmpty else { return }
-            let text = bucket.map(\.char).joined().trimmingCharacters(in: .whitespaces)
-            guard !text.isEmpty else { bucket = []; return }
-
-            let unionRect = bucket.reduce(CGRect.null) { $0.union($1.bounds) }
-            let dominant  = bucket.max(by: { $0.font.pointSize < $1.font.pointSize })!
+        /// Emit a single PDFTextLine from a contiguous horizontal segment of chars.
+        func emitSegment(_ chars: [CharInfo]) {
+            let text = chars.map(\.char).joined().trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { return }
+            let unionRect = chars.reduce(CGRect.null) { $0.union($1.bounds) }
+            let dominant  = chars.max(by: { $0.font.pointSize < $1.font.pointSize })!
             let rgb = dominant.color.usingColorSpace(.deviceRGB) ?? NSColor.black
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
-
             lines.append(PDFTextLine(
-                text:      text,
-                x:         unionRect.minX,
-                y:         unionRect.minY,
-                width:     unionRect.width,
-                height:    unionRect.height,
-                fontName:  dominant.font.fontName,
-                fontSize:  dominant.font.pointSize,
-                colorR:    Float(r),
-                colorG:    Float(g),
-                colorB:    Float(b)
+                text:     text,
+                x:        unionRect.minX, y: unionRect.minY,
+                width:    unionRect.width, height: unionRect.height,
+                fontName: dominant.font.fontName,
+                fontSize: dominant.font.pointSize,
+                colorR:   Float(r), colorG: Float(g), colorB: Float(b)
             ))
+        }
+
+        func flushBucket() {
+            guard !bucket.isEmpty else { bucket = []; return }
+
+            // Sort by X — chars in the bucket share a baseline but may come from
+            // different text objects in the PDF (multi-column, side-by-side boxes).
+            let sorted = bucket.sorted { $0.bounds.minX < $1.bounds.minX }
+
+            // Split on large horizontal gaps. Two chars separated by more than
+            // 2.5× the average character width are almost certainly in different
+            // text objects, not a single word space.
+            let avgWidth = sorted.map { $0.bounds.width }.reduce(0, +) / CGFloat(sorted.count)
+            let gapThreshold = max(avgWidth * 2.5, 6.0)
+
+            var segments: [[CharInfo]] = [[]]
+            for (i, ch) in sorted.enumerated() {
+                if i == 0 {
+                    segments[segments.count - 1].append(ch)
+                } else {
+                    let gap = ch.bounds.minX - sorted[i - 1].bounds.maxX
+                    if gap > gapThreshold {
+                        segments.append([ch])
+                    } else {
+                        segments[segments.count - 1].append(ch)
+                    }
+                }
+            }
+            for seg in segments { emitSegment(seg) }
             bucket = []
         }
 

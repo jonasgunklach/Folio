@@ -32,6 +32,7 @@ enum ActiveTool: String, CaseIterable, Identifiable {
     case underline      = "Underline"
     case text           = "Comment"
     case addText        = "Text Box"
+    case editText       = "Edit Text"
     case shape          = "Shape"
     case stamp          = "Stamp"
     case signature      = "Signature"
@@ -48,8 +49,9 @@ enum ActiveTool: String, CaseIterable, Identifiable {
         case .underline:        "underline"
         case .text:             "bubble.left.fill"
         case .addText:          "textbox"
+        case .editText:         "character.cursor.ibeam"
         case .shape:            "square.on.circle"
-        case .stamp:            "stamp.fill"
+        case .stamp:            "seal.fill"
         case .signature:        "signature"
         case .audioNote:        "mic.fill"
         }

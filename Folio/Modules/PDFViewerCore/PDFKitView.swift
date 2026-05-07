@@ -56,6 +56,10 @@ struct PDFKitView: NSViewRepresentable {
     /// finishes placing its annotation.  Use to switch back to the select tool.
     var onPlacementDone: (() -> Void)?
     var onImageDropped: ((NSImage, PDFPage, CGRect) -> Void)?
+    /// Called when the editText tool is active and the user clicks on a text line.
+    /// Passes the tapped `PDFTextLine` and its rect in PDFView (NSView) coordinates
+    /// (origin bottom-left, Y increases upward) so the caller can position an overlay.
+    var onTextLineTapped: ((PDFTextLine, CGRect) -> Void)?
 
     // MARK: - NSViewRepresentable
 
@@ -202,7 +206,7 @@ struct PDFKitView: NSViewRepresentable {
                 guard let self, let pv = self.cursorPDFView,
                       event.window === pv.window else { return event }
                 let tool = self.parent.activeTool
-                guard tool.isMarkupTool else { return event }
+                guard tool.isMarkupTool || tool == .editText else { return event }
                 let viewPoint = pv.convert(event.locationInWindow, from: nil)
                 guard pv.bounds.contains(viewPoint) else { return event }
                 // Don't force cursor when hovering over a sibling view (e.g. the palette).
@@ -382,6 +386,19 @@ struct PDFKitView: NSViewRepresentable {
             }
         }
 
+        // MARK: - Text line hit-testing (editText tool)
+
+        /// Returns the text line from `lines` nearest to `point` (in page coordinates).
+        private func nearestLine(to point: CGPoint, in lines: [PDFTextLine]) -> PDFTextLine? {
+            lines.min { distanceFromPoint(point, toRect: $0.bounds) < distanceFromPoint(point, toRect: $1.bounds) }
+        }
+
+        private func distanceFromPoint(_ point: CGPoint, toRect rect: CGRect) -> CGFloat {
+            let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+            let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+            return hypot(dx, dy)
+        }
+
         private func handleMouseDown(event: NSEvent, pv: DrawablePDFView, viewPoint: CGPoint) -> NSEvent? {
             // If the resize overlay is active, let it handle events on its own hit area
             // regardless of the currently active tool.  This makes placed annotations
@@ -398,6 +415,14 @@ struct PDFKitView: NSViewRepresentable {
             case .text:
                 pv.showStickyPopover(at: viewPoint, coordinator: self,
                                      existingAnnotation: nil, viewOnly: false)
+                return nil
+
+            case .stamp:
+                guard let page = pv.page(for: viewPoint, nearest: true) else { return event }
+                let pp = pv.convert(viewPoint, to: page)
+                guard let template = self.parent.annotationViewModel.selectedStamp else { return event }
+                self.parent.annotationViewModel.addStamp(template, on: page, at: pp)
+                self.parent.onAnnotationAdded()
                 return nil
 
             case .addText:
@@ -475,6 +500,75 @@ struct PDFKitView: NSViewRepresentable {
                     deselectAnnotationResize()
                 }
                 return event
+
+            case .editText:
+                guard let page = pv.page(for: viewPoint, nearest: false) else { return event }
+                let pagePoint = pv.convert(viewPoint, to: page)
+
+                // Resolve font/colour at the exact click position.
+                let attrStr = page.attributedString ?? NSAttributedString()
+                guard attrStr.length > 0 else { return event }
+                let charIdx  = max(0, min(page.characterIndex(at: pagePoint), attrStr.length - 1))
+                let font     = attrStr.attribute(.font,            at: charIdx, effectiveRange: nil) as? NSFont  ?? NSFont.systemFont(ofSize: 12)
+                let rawColor = attrStr.attribute(.foregroundColor, at: charIdx, effectiveRange: nil) as? NSColor ?? NSColor.black
+                let rgb      = rawColor.usingColorSpace(.deviceRGB) ?? NSColor.black
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
+
+                // Try to expand from a single line to the full paragraph.
+                // NSString.paragraphRange(for:) returns the range between hard
+                // paragraph separators (\n, \r, U+2029). When a paragraph spans
+                // multiple visual lines without an embedded newline, this captures
+                // them all.  When each visual line ends with \n the range equals
+                // the line (same result as selectionForLine — no regression).
+                let nsStr     = attrStr.string as NSString
+                let paraRange = nsStr.paragraphRange(for: NSRange(location: charIdx, length: 0))
+                let lineSel   = page.selectionForLine(at: pagePoint)
+
+                // Prefer paragraph selection but cap at 10 lines to avoid
+                // accidentally selecting an entire column with no newlines.
+                let useParagraph: Bool
+                if let paraSel = page.selection(for: paraRange),
+                   let paraStr = paraSel.string,
+                   !paraStr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   (paraSel.selectionsByLine().count) <= 10,
+                   paraSel.selectionsByLine().count > 1 {
+                    useParagraph = true
+                    let selBounds = paraSel.bounds(for: page)
+                    let viewRect  = pv.convert(selBounds, from: page)
+                    let line = PDFTextLine(
+                        text:     paraStr.trimmingCharacters(in: .whitespacesAndNewlines),
+                        x:        selBounds.minX, y: selBounds.minY,
+                        width:    selBounds.width, height: selBounds.height,
+                        fontName: font.fontName,
+                        fontSize: font.pointSize,
+                        colorR:   Float(r), colorG: Float(g), colorB: Float(b)
+                    )
+                    parent.onTextLineTapped?(line, viewRect)
+                    return nil
+                } else {
+                    useParagraph = false
+                }
+
+                // Single line fallback.
+                guard !useParagraph,
+                      let sel = lineSel,
+                      let rawText = sel.string,
+                      !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                else { return event }
+
+                let selBounds = sel.bounds(for: page)
+                let viewRect  = pv.convert(selBounds, from: page)
+                let line = PDFTextLine(
+                    text:     rawText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    x:        selBounds.minX, y: selBounds.minY,
+                    width:    selBounds.width, height: selBounds.height,
+                    fontName: font.fontName,
+                    fontSize: font.pointSize,
+                    colorR:   Float(r), colorG: Float(g), colorB: Float(b)
+                )
+                parent.onTextLineTapped?(line, viewRect)
+                return nil
 
             case .signature:
                 if let page = pv.page(for: viewPoint, nearest: true) {
@@ -742,6 +836,76 @@ final class PDFCommentAnnotation: PDFAnnotation {
             CGPoint(x: lx, y: midY + 3), CGPoint(x: rx,     y: midY + 3),
             CGPoint(x: lx, y: midY - 3), CGPoint(x: rx - 3, y: midY - 3)
         ])
+
+        context.restoreGState()
+    }
+}
+
+// MARK: - PDFTextStampAnnotation
+// Renders a text-label stamp (e.g. "APPROVED", "DRAFT") with a coloured border
+// and bold condensed text, similar to a rubber-stamp look.
+
+final class PDFTextStampAnnotation: PDFAnnotation {
+    let label: String
+    let stampColor: NSColor
+
+    init(label: String, color: NSColor, bounds: CGRect) {
+        self.label      = label
+        self.stampColor = color
+        super.init(bounds: bounds, forType: .stamp, withProperties: nil)
+        self.color     = color
+        shouldDisplay  = true
+        shouldPrint    = true
+        isReadOnly     = false
+        setValue("textstamp" as NSString,
+                 forAnnotationKey: PDFAnnotationKey(rawValue: "/FolioType"))
+    }
+
+    required init?(coder: NSCoder) { fatalError("NSCoder not supported") }
+
+    override func draw(with box: PDFDisplayBox, in context: CGContext) {
+        let r = bounds
+        let inset: CGFloat = 2.5
+        let inner = r.insetBy(dx: inset, dy: inset)
+        let cr: CGFloat = 4
+
+        context.saveGState()
+
+        // Fill with very faint tint
+        context.setFillColor(stampColor.withAlphaComponent(0.07).cgColor)
+        let fillPath = CGPath(roundedRect: inner, cornerWidth: cr, cornerHeight: cr, transform: nil)
+        context.addPath(fillPath)
+        context.fillPath()
+
+        // Double-line border (outer slightly lighter, inner full colour)
+        let outerPath = CGPath(roundedRect: inner, cornerWidth: cr, cornerHeight: cr, transform: nil)
+        context.addPath(outerPath)
+        context.setStrokeColor(stampColor.withAlphaComponent(0.4).cgColor)
+        context.setLineWidth(3.5)
+        context.strokePath()
+
+        let innerInset = inner.insetBy(dx: 2.5, dy: 2.5)
+        let innerPath = CGPath(roundedRect: innerInset, cornerWidth: cr - 1, cornerHeight: cr - 1, transform: nil)
+        context.addPath(innerPath)
+        context.setStrokeColor(stampColor.cgColor)
+        context.setLineWidth(1.5)
+        context.strokePath()
+
+        // Label text — bold, condensed, centred
+        let fontSize = min(inner.height * 0.52, 18)
+        let font = CTFontCreateWithName("HelveticaNeue-CondensedBold" as CFString, fontSize, nil)
+        let attrs: [CFString: Any] = [
+            kCTFontAttributeName:            font,
+            kCTForegroundColorAttributeName: stampColor.cgColor
+        ]
+        let attrStr = CFAttributedStringCreate(nil, label as CFString, attrs as CFDictionary)!
+        let line    = CTLineCreateWithAttributedString(attrStr)
+        let lineBounds = CTLineGetBoundsWithOptions(line, [])
+        let tx = inner.midX - lineBounds.width / 2
+        let ty = inner.midY - lineBounds.height / 2 - lineBounds.origin.y
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: 1)
+        context.textPosition = CGPoint(x: tx, y: ty)
+        CTLineDraw(line, context)
 
         context.restoreGState()
     }

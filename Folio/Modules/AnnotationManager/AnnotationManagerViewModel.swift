@@ -154,6 +154,7 @@ final class AnnotationManagerViewModel {
     // MARK: - Stamp Settings
 
     var availableStamps: [StampTemplate] = StampTemplate.defaults
+    var selectedStamp: StampTemplate? = StampTemplate.defaults.first
 
     // MARK: - Init
 
@@ -205,9 +206,11 @@ final class AnnotationManagerViewModel {
             width: 120,
             height: 40
         )
-        let annotation = PDFAnnotation(bounds: stampBounds, forType: .stamp, withProperties: nil)
-        annotation.setValue(template.label, forAnnotationKey: .contents)
-        annotation.color = template.color
+        let annotation = PDFTextStampAnnotation(
+            label:  template.label,
+            color:  template.color,
+            bounds: stampBounds
+        )
         page.addAnnotation(annotation)
     }
 

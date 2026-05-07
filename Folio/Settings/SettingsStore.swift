@@ -115,7 +115,7 @@ final class SettingsStore {
     // MARK: Tools
 
     /// The annotation tools visible in the toolbar segmented picker.
-    var visibleTools: Set<ActiveTool> = [.select, .markup, .text, .addText, .shape, .signature] {
+    var visibleTools: Set<ActiveTool> = [.select, .markup, .text, .addText, .editText, .shape, .signature] {
         didSet {
             let raw = visibleTools.map(\.rawValue)
             UserDefaults.standard.set(raw, forKey: Keys.visibleTools)
@@ -191,7 +191,9 @@ final class SettingsStore {
         strikethroughColor   = loadColor(key: Keys.strikethroughColor) ?? .red
         if let raw = d.stringArray(forKey: Keys.visibleTools) {
             let tools = raw.compactMap(ActiveTool.init(rawValue:))
-            if !tools.isEmpty { visibleTools = Set(tools) }
+            // Union with the compile-time default so newly added tools are never
+            // silently missing when a user upgrades from an older build.
+            if !tools.isEmpty { visibleTools = Set(tools).union(visibleTools) }
         }
         aiProvider = AIProvider(rawValue: d.string(forKey: Keys.aiProvider) ?? "") ?? .openAI
         aiModel    = d.string(forKey: Keys.aiModel) ?? aiProvider.defaultModel

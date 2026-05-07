@@ -6,9 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		A675E6F02F9FE86F00C137B9 /* Folio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Folio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -67,7 +64,8 @@
 				A675E6F22F9FE86F00C137B9 /* Folio */,
 			);
 			name = Folio;
-			packageProductDependencies = ();
+			packageProductDependencies = (
+			);
 			productName = Folio;
 			productReference = A675E6F02F9FE86F00C137B9 /* Folio.app */;
 			productType = "com.apple.product-type.application";
@@ -96,7 +94,8 @@
 			);
 			mainGroup = A675E6E72F9FE86F00C137B9;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = ();
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A675E6F12F9FE86F00C137B9 /* Products */;
 			projectDirPath = "";
@@ -338,8 +337,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-
 	};
 	rootObject = A675E6E82F9FE86F00C137B9 /* Project object */;
 }

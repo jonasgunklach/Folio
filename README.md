@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A native macOS PDF editor built with SwiftUI, PDFKit, MuPDFKit, and the Swift Observation framework.<br>
+  A native macOS PDF editor built with SwiftUI, PDFKit, CoreGraphics, CoreText, and the Swift Observation framework.<br>
   Designed to feel at home on macOS 26 with a Liquid Glass toolbar aesthetic.
 </p>
 
@@ -44,15 +44,16 @@
 - **Reading modes** — Default · Night · Sepia (toolbar dropdown)
 - Text selection with instant annotation application
 
-### Annotation Tools
+### Annotation & Editing Tools
 | Tool | Shortcut | Description |
 |------|----------|-------------|
 | Select | E | Move/resize existing annotations |
 | Markup | M | Grouped picker for highlight, underline, and strikethrough |
 | Comment | C | Click to place a speech-bubble annotation |
 | Text Box | T | Click to insert an editable, resizable text box |
+| **Edit Text** | — | Click any PDF text to edit it inline — single lines or full paragraphs |
 | Shape | S | Draw rectangle, ellipse, or line overlay annotations |
-| Stamp | — | Apply pre-defined or custom PDF stamps |
+| Stamp | — | Click to place a text stamp (APPROVED, DRAFT, etc.) from the palette |
 | Signature | G | Draw a freehand signature; resizable via PDFKit handles |
 | Audio Note | — | Embed a voice-recording annotation |
 
@@ -111,6 +112,7 @@
 | Markup (highlight / underline / strikethrough) | M |
 | Comment | C |
 | Text Box | T |
+| Edit Text | — |
 | Shape | S |
 | Signature | G |
 | Settings | ⌘, |
@@ -139,11 +141,15 @@ Folio/
 │   ├── ReadingMode.swift         # Default / Night / Sepia
 │   └── ViewMode.swift            # Scroll / Grid
 ├── Services/
-│   └── AIService.swift           # @Observable — OpenAI / Anthropic / Groq HTTPS calls
+│   ├── AIService.swift           # @Observable — OpenAI / Anthropic / Groq HTTPS calls
+│   └── CorePDFEngine.swift       # App Store–safe PDF mutation engine (no third-party libs)
+│                                 #   • Image insertion via CGContext
+│                                 #   • Text replacement via CTFramesetter / CTLineDraw
+│                                 #   • Text extraction via PDFPage.characterBounds + line grouping
 ├── Modules/
-│   ├── PDFViewerCore/            # NSViewRepresentable PDFView bridge, zoom VM, cursor monitors
+│   ├── PDFViewerCore/            # NSViewRepresentable PDFView bridge, inline text editor overlay
 │   ├── AnnotationManager/        # Annotation VM + floating colour/opacity palette
-│   ├── ContentEditor/            # Direct PDF text editing via MuPDF (extract + rewrite text lines)
+│   ├── ContentEditor/            # Sidebar panel for bulk text/image editing via CorePDFEngine
 │   ├── DocumentIntelligence/     # OCR (Vision), scan enhancement (CoreImage), summarisation
 │   ├── PageOrganizer/            # Grid reorder view + VM (copy/paste/add-empty/rotate/delete)
 │   └── FormsAndSignatures/       # Signature canvas + PDFKit freeText annotation commit
@@ -156,18 +162,18 @@ Folio/
     ├── SettingsStore.swift        # @Observable UserDefaults-backed preferences
     ├── SettingsView.swift         # TabView shell with icon strip
     └── Panes/                     # General · Display · Annotations · Tools · AI
-MuPDFKit/                          # Local Swift package wrapping libmupdf (C) via SPM
-├── Sources/MuPDFCore/             # C bridging layer + prebuilt static libraries (.a)
-└── Sources/MuPDFKit/              # Swift API — MuPDFEngine (text extraction & rewriting)
 ```
 
 **Key patterns:**
 - `@Observable` + `@MainActor` throughout — no `ObservableObject` or `Combine`
-- `NSViewRepresentable` bridge to `PDFKit.PDFView` with `NSEvent` global monitors for annotation clicks
+- `NSViewRepresentable` bridge to `PDFKit.PDFView` with `NSEvent` local monitors for annotation + editing clicks
+- Inline text editing: `PDFPage.selectionForLine` / `NSString.paragraphRange` for structure-aware hit detection; `NSTextField` overlay positioned in SwiftUI coordinates
+- PDF mutation via bare `CGContext` PDF output — `CTFramesetterCreateWithAttributedString` + `CTFrameDraw` for paragraph reflow, `CTLineDraw` for single-line replacement; no AppKit graphics context required
 - `Transferable` + `.draggable` / `.dropDestination` for page reorder
 - Security-scoped resource bookmarks held open for the lifetime of each tab
 - `Task.detached(priority: .userInitiated)` for non-blocking PDF serialisation and disk write
 - API keys in `kSecClassGenericPassword` Keychain items, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+- **No AGPL dependencies** — MuPDF fully replaced by CoreGraphics + CoreText + PDFKit; App Store compliant
 
 ---
 

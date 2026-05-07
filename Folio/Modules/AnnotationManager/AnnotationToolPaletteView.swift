@@ -274,15 +274,24 @@ struct StampPaletteControls: View {
                 .foregroundStyle(.secondary)
 
             ForEach(viewModel.availableStamps) { stamp in
-                Text(stamp.label)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(stamp.color))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 4)
-                            .strokeBorder(Color(stamp.color), lineWidth: 1.5)
-                    }
+                let isSelected = viewModel.selectedStamp?.id == stamp.id
+                Button {
+                    viewModel.selectedStamp = stamp
+                } label: {
+                    Text(stamp.label)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color(stamp.color))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            isSelected ? Color(stamp.color).opacity(0.12) : Color.clear
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(Color(stamp.color), lineWidth: isSelected ? 2.5 : 1.5)
+                        }
+                }
+                .buttonStyle(.plain)
             }
         }
     }
