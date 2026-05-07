@@ -1,4 +1,0 @@
-module MuPDFCore {
-    umbrella header "MuPDFCore.h"
-    export *
-}

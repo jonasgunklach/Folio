@@ -25,7 +25,6 @@
 import Foundation
 import PDFKit
 import AppKit
-import MuPDFKit
 
 /// Direct PDF content editing backed by libmupdf.
 ///
@@ -79,12 +78,12 @@ final class ContentEditorViewModel {
 
             var caughtError: ContentEditorError?
             do {
-                let doc = try MuPDFDocument(url: documentURL)
-                let pdfRect = MuPDFDocument.convertToPDFCoords(
+                let doc = try CorePDFDocument(url: documentURL)
+                let pdfRect = CorePDFDocument.convertToPDFCoords(
                     appKitRect: rect, pageHeight: pageHeight)
                 try doc.insertImage(pngData, onPage: pageIndex, at: pdfRect)
                 try doc.save(to: documentURL)
-            } catch let e as MuPDFError {
+            } catch let e as CorePDFError {
                 caughtError = .muPDFError(e.localizedDescription ?? e.errorDescription ?? "Unknown error")
             } catch {
                 caughtError = .muPDFError(error.localizedDescription)
@@ -125,14 +124,14 @@ final class ContentEditorViewModel {
             var caughtError: ContentEditorError?
             var savedData: Data?
             do {
-                let doc = try MuPDFDocument(url: documentURL)
+                let doc = try CorePDFDocument(url: documentURL)
                 try doc.replaceText(newText, onPage: pageIndex, at: rect,
                                     fontName: fontName, fontSize: fontSize,
                                     colorR: colorR, colorG: colorG, colorB: colorB)
                 // Save to temp and return raw bytes — never write directly to the
                 // sandboxed user URL here; DocumentTab.save() handles that.
                 savedData = try doc.saveAsData()
-            } catch let e as MuPDFError {
+            } catch let e as CorePDFError {
                 caughtError = .muPDFError(e.localizedDescription ?? e.errorDescription ?? "Unknown error")
             } catch {
                 caughtError = .muPDFError(error.localizedDescription)
@@ -158,13 +157,13 @@ final class ContentEditorViewModel {
         Task.detached(priority: .userInitiated) { [weak self] in
             var lines: [PDFTextLine] = []
             var caughtError: ContentEditorError?
-            do {
-                let doc = try MuPDFDocument(url: documentURL)
-                lines = try doc.extractTextLines(from: pageIndex)
-            } catch let e as MuPDFError {
-                caughtError = .muPDFError(e.localizedDescription ?? e.errorDescription ?? "Unknown error")
-            } catch {
-                caughtError = .muPDFError(error.localizedDescription)
+            let accessing = documentURL.startAccessingSecurityScopedResource()
+            defer { if accessing { documentURL.stopAccessingSecurityScopedResource() } }
+            if let pdfDoc = PDFDocument(url: documentURL),
+               let page = pdfDoc.page(at: pageIndex) {
+                lines = CorePDFDocument.extractTextLines(from: page)
+            } else {
+                caughtError = .muPDFError("Could not open PDF page at index \(pageIndex)")
             }
             await MainActor.run { [weak self] in
                 self?.isWorking = false

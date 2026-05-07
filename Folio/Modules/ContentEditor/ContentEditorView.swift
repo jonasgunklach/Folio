@@ -25,7 +25,6 @@
 import SwiftUI
 import PDFKit
 import UniformTypeIdentifiers
-import MuPDFKit
 
 /// Inspector panel for direct PDF text editing backed by MuPDF.
 struct ContentEditorView: View {
