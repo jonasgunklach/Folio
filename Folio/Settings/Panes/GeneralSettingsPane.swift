@@ -14,10 +14,22 @@ struct GeneralSettingsPane: View {
         @Bindable var settings = settings
         Form {
             // ── Appearance ────────────────────────────────────────────
-            Section("Appearance") {
+            Section {
                 AppearancePicker(selection: $settings.appearanceMode)
-                Divider().padding(.vertical, 4)
+            } header: {
+                Text("Theme")
+            } footer: {
+                Text("Controls the overall light/dark appearance of the app.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 TabBarStylePicker(selection: $settings.tabBarStyle)
+            } header: {
+                Text("Tab Style")
+            } footer: {
+                Text("\"In Toolbar\" embeds tabs inside the title bar. \"Tab Bar\" shows a dedicated strip below it.")
+                    .foregroundStyle(.secondary)
             }
 
             // ── On Launch ────────────────────────────────────────────

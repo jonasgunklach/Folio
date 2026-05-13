@@ -147,7 +147,7 @@ struct DocumentTabItem: View {
         .frame(width: 52, height: 30)
         // ── Background ──────────────────────────────────────────────
         .background {
-            RoundedRectangle(cornerRadius: 7)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(
                     isActive
                         ? Color(NSColor.controlBackgroundColor)
@@ -158,7 +158,7 @@ struct DocumentTabItem: View {
                     radius: 3, y: 1
                 )
         }
-        .contentShape(RoundedRectangle(cornerRadius: 7))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
         .help(tab.isModified ? "\(tab.title) — Unsaved changes" : tab.title)
         .onTapGesture {
             appState.activateTab(tab.id)

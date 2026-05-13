@@ -63,11 +63,11 @@ struct AnnotationToolPaletteView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.14), radius: 10, y: 3)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            Capsule()
                 .strokeBorder(.separator.opacity(0.4), lineWidth: 0.5)
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))

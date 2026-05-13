@@ -108,6 +108,16 @@ struct ContentView: View {
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isSidebarVisible)
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isAISidebarVisible)
         .animation(.spring(response: 0.32, dampingFraction: 0.85), value: appState.isContentEditorVisible)
+        .onChange(of: appState.activeTool) { _, newTool in
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                if newTool == .editText {
+                    appState.isContentEditorVisible = true
+                    appState.isAISidebarVisible = false
+                } else {
+                    appState.isContentEditorVisible = false
+                }
+            }
+        }
         // ── Tab bar row (pinned below toolbar when style == .bar) ─────
         .safeAreaInset(edge: .top, spacing: 0) {
             if settings.tabBarStyle == .bar {
@@ -189,9 +199,9 @@ struct ContentView: View {
                     DocumentTabBar()
                         .frame(minWidth: 300, maxWidth: .infinity)
                 } else {
-                    // Full-width clear view preserves the three-zone layout
-                    // (nav left / primary right) without visible separator lines.
-                    Color.clear.frame(minWidth: 100, maxWidth: .infinity)
+                    // Zero-width anchor keeps the three-zone toolbar layout intact
+                    // without giving macOS a sized view to wrap in a Liquid Glass pill.
+                    Color.clear.frame(width: 0, height: 0)
                 }
             }
 
@@ -258,25 +268,6 @@ struct ContentView: View {
                 }
                 .disabled(!hasDoc)
                 .help("Reading Mode: \(tab?.readingMode.rawValue ?? "Default")")
-            }
-
-            // ── Edit Content toggle ────────────────────────────────────
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
-                        let opening = !appState.isContentEditorVisible
-                        appState.isContentEditorVisible = opening
-                        if opening { appState.isAISidebarVisible = false }
-                    }
-                } label: {
-                    Image(systemName: appState.isContentEditorVisible
-                          ? "pencil.and.ruler.fill" : "pencil.and.ruler")
-                        .font(.system(size: 14))
-                        .foregroundStyle(appState.isContentEditorVisible
-                                         ? Color.accentColor : Color.primary)
-                }
-                .disabled(!hasDoc)
-                .help(appState.isContentEditorVisible ? "Hide Content Editor" : "Insert Images & Edit Content")
             }
 
             // ── Rightmost: AI Assistant ────────────────────────────────
