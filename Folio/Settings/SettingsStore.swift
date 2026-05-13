@@ -132,6 +132,13 @@ final class SettingsStore {
         didSet { save(aiModel, key: Keys.aiModel) }
     }
 
+    // MARK: Onboarding
+
+    /// `false` until the user finishes the first-launch onboarding flow.
+    var hasCompletedOnboarding: Bool = false {
+        didSet { save(hasCompletedOnboarding, key: Keys.hasCompletedOnboarding) }
+    }
+
     // MARK: Recent Files
 
     /// Returns the most-recently-opened PDF URLs resolved from stored security-scoped bookmarks.
@@ -197,6 +204,7 @@ final class SettingsStore {
         }
         aiProvider = AIProvider(rawValue: d.string(forKey: Keys.aiProvider) ?? "") ?? .openAI
         aiModel    = d.string(forKey: Keys.aiModel) ?? aiProvider.defaultModel
+        hasCompletedOnboarding = d.bool(forKey: Keys.hasCompletedOnboarding)
     }
 
     private func save(_ value: some Any, key: String) {
@@ -234,5 +242,6 @@ final class SettingsStore {
         static let aiProvider               = "settings.aiProvider"
         static let aiModel                  = "settings.aiModel"
         static let recentFiles              = "settings.recentFiles"
+        static let hasCompletedOnboarding   = "settings.hasCompletedOnboarding"
     }
 }

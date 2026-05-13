@@ -127,6 +127,16 @@ struct ContentView: View {
                 }
             }
         }
+        // ── First-launch onboarding ───────────────────────────────────
+        .sheet(isPresented: Binding(
+            get: { !settings.hasCompletedOnboarding },
+            set: { newValue in
+                if !newValue { settings.hasCompletedOnboarding = true }
+            }
+        )) {
+            OnboardingView()
+                .environment(settings)
+        }
 
         // ── Toolbar ────────────────────────────────────────────────────
         .toolbar {

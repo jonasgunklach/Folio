@@ -226,8 +226,6 @@ struct PDFKitView: NSViewRepresentable {
             guard tool.isMarkupTool else { return }
 
             // Resolve the effective sub-tool
-            let subtype: PDFAnnotationSubtype
-            let color: NSColor
             let effectiveTool: ActiveTool
             if tool == .markup {
                 effectiveTool = {
@@ -647,12 +645,6 @@ struct PDFKitView: NSViewRepresentable {
                 shapePreviewAnn = nil
             }
             let endPP = pv.convert(viewPoint, to: page)
-            let rect = CGRect(
-                x: min(startPP.x, endPP.x),
-                y: min(startPP.y, endPP.y),
-                width:  abs(endPP.x - startPP.x),
-                height: abs(endPP.y - startPP.y)
-            )
             shapeDragStart = nil
             shapeDragPage  = nil
 
@@ -1094,7 +1086,7 @@ fileprivate final class DrawablePDFView: PDFView {
         popover.animates = true
         let vc = SignaturePanelViewController()
         vc.prefillName = annotation.contents ?? ""
-        vc.onCommit = { [weak self, weak coordinator, weak popover, weak annotation] name, fontName, color, fontSize in
+        vc.onCommit = { [weak self, weak popover, weak annotation] name, fontName, color, fontSize in
             popover?.close()
             guard let ann = annotation else { return }
             let pointSize = max(14, fontSize)

@@ -70,28 +70,26 @@ final class ContentEditorViewModel {
         isWorking = true
         lastError = nil
 
-        Task.detached(priority: .userInitiated) { [weak self] in
-            // Re-enter the security scope inside this detached task so the
-            // sandbox allows the atomic Data.write() back to the original URL.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            // Re-enter the security scope so the sandbox allows the write back to the URL.
             let accessing = documentURL.startAccessingSecurityScopedResource()
             defer { if accessing { documentURL.stopAccessingSecurityScopedResource() } }
 
-            var caughtError: ContentEditorError?
             do {
                 let doc = try CorePDFDocument(url: documentURL)
                 let pdfRect = CorePDFDocument.convertToPDFCoords(
                     appKitRect: rect, pageHeight: pageHeight)
                 try doc.insertImage(pngData, onPage: pageIndex, at: pdfRect)
                 try doc.save(to: documentURL)
+                isWorking = false
+                completion?()
             } catch let e as CorePDFError {
-                caughtError = .muPDFError(e.localizedDescription ?? e.errorDescription ?? "Unknown error")
+                isWorking = false
+                lastError = .muPDFError(e.localizedDescription)
             } catch {
-                caughtError = .muPDFError(error.localizedDescription)
-            }
-            await MainActor.run { [weak self] in
-                self?.isWorking = false
-                self?.lastError = caughtError
-                if caughtError == nil { completion?() }
+                isWorking = false
+                lastError = .muPDFError(error.localizedDescription)
             }
         }
     }
@@ -116,30 +114,26 @@ final class ContentEditorViewModel {
         isWorking = true
         lastError = nil
 
-        Task.detached(priority: .userInitiated) { [weak self] in
-            // Enter security scope to open the file for reading.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             let accessing = documentURL.startAccessingSecurityScopedResource()
             defer { if accessing { documentURL.stopAccessingSecurityScopedResource() } }
 
-            var caughtError: ContentEditorError?
-            var savedData: Data?
             do {
                 let doc = try CorePDFDocument(url: documentURL)
                 try doc.replaceText(newText, onPage: pageIndex, at: rect,
                                     fontName: fontName, fontSize: fontSize,
                                     colorR: colorR, colorG: colorG, colorB: colorB)
-                // Save to temp and return raw bytes — never write directly to the
-                // sandboxed user URL here; DocumentTab.save() handles that.
-                savedData = try doc.saveAsData()
+                // Return raw bytes — DocumentTab.save() handles writing to the sandbox URL.
+                let savedData = try doc.saveAsData()
+                isWorking = false
+                completion?(savedData)
             } catch let e as CorePDFError {
-                caughtError = .muPDFError(e.localizedDescription ?? e.errorDescription ?? "Unknown error")
+                isWorking = false
+                lastError = .muPDFError(e.localizedDescription)
             } catch {
-                caughtError = .muPDFError(error.localizedDescription)
-            }
-            await MainActor.run { [weak self] in
-                self?.isWorking = false
-                self?.lastError = caughtError
-                if let data = savedData { completion?(data) }
+                isWorking = false
+                lastError = .muPDFError(error.localizedDescription)
             }
         }
     }
@@ -154,21 +148,19 @@ final class ContentEditorViewModel {
         isWorking = true
         lastError = nil
 
-        Task.detached(priority: .userInitiated) { [weak self] in
-            var lines: [PDFTextLine] = []
-            var caughtError: ContentEditorError?
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             let accessing = documentURL.startAccessingSecurityScopedResource()
             defer { if accessing { documentURL.stopAccessingSecurityScopedResource() } }
             if let pdfDoc = PDFDocument(url: documentURL),
                let page = pdfDoc.page(at: pageIndex) {
-                lines = CorePDFDocument.extractTextLines(from: page)
-            } else {
-                caughtError = .muPDFError("Could not open PDF page at index \(pageIndex)")
-            }
-            await MainActor.run { [weak self] in
-                self?.isWorking = false
-                self?.lastError = caughtError
+                let lines = CorePDFDocument.extractTextLines(from: page)
+                isWorking = false
                 completion(lines)
+            } else {
+                isWorking = false
+                lastError = .muPDFError("Could not open PDF page at index \(pageIndex)")
+                completion([])
             }
         }
     }

@@ -14,6 +14,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case annotations = "Annotations"
     case tools       = "Tools"
     case ai          = "AI"
+    case tipJar      = "Tip Jar"
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .annotations: "pencil.and.outline"
         case .tools:       "wrench.and.screwdriver"
         case .ai:          "sparkles"
+        case .tipJar:      "heart.fill"
         }
     }
 }
@@ -55,6 +57,7 @@ struct SettingsView: View {
         case .annotations: AnnotationsSettingsPane()
         case .tools:       ToolsSettingsPane()
         case .ai:          AISettingsPane()
+        case .tipJar:      TipJarSettingsPane()
         }
     }
 }

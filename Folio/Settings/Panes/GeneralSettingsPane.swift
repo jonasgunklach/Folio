@@ -43,6 +43,12 @@ struct GeneralSettingsPane: View {
                 }
 
                 Toggle("Show sidebar by default", isOn: $settings.showSidebarByDefault)
+
+                Button {
+                    settings.hasCompletedOnboarding = false
+                } label: {
+                    Label("Show Welcome Guide", systemImage: "hand.wave")
+                }
             }
         }
         .formStyle(.grouped)

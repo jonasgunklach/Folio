@@ -86,7 +86,7 @@ struct ContentEditorView: View {
             // ── Errors ───────────────────────────────────────────────────────
             if let error = viewModel.lastError {
                 Section {
-                    Label(error.localizedDescription ?? "Unknown error",
+                    Label(error.localizedDescription,
                           systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                         .font(.caption)
