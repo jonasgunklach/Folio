@@ -5,8 +5,15 @@
 </p>
 
 <p align="center">
-  A native macOS PDF editor built with SwiftUI, PDFKit, CoreGraphics, CoreText, and the Swift Observation framework.<br>
-  Designed to feel at home on macOS 26 with a Liquid Glass toolbar aesthetic.
+  <strong>A native macOS PDF editor — no frameworks, no dependencies, fully App Store compliant.</strong><br>
+  Built with SwiftUI, PDFKit, CoreGraphics, and CoreText. Designed to feel at home on macOS 26 with a Liquid Glass toolbar aesthetic.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-26%2B-blue?logo=apple" alt="macOS 26+">
+  <img src="https://img.shields.io/badge/Swift-6-orange?logo=swift" alt="Swift 6">
+  <img src="https://img.shields.io/badge/SwiftUI-native-green" alt="SwiftUI">
+  <img src="https://img.shields.io/badge/PDFKit-native-purple" alt="PDFKit">
 </p>
 
 ---
@@ -14,18 +21,48 @@
 ## Screenshots
 
 <p align="center">
-  <img src="Screenshots/view1-light.png" width="780" alt="Scroll view — light mode">
-  <br><em>Scroll view with thumbnail sidebar, annotation tools, and resizable AI sidebar</em>
+  <img src="Screenshots/start-screen.png" width="780" alt="Welcome screen">
+  <br><em>Welcome screen — drag-and-drop zone with Recent Files grid</em>
 </p>
 
 <p align="center">
-  <img src="Screenshots/view2-light.png" width="780" alt="Page grid — light mode">
-  <br><em>Page organizer grid in light mode</em>
+  <img src="Screenshots/page-view.png" width="780" alt="Scroll view with AI sidebar">
+  <br><em>Scroll view with thumbnail sidebar and resizable AI Assistant panel</em>
 </p>
 
 <p align="center">
-  <img src="Screenshots/view2-black.png" width="780" alt="Page grid — dark mode">
-  <br><em>Page organizer grid in dark mode — 642-page document</em>
+  <img src="Screenshots/3-tabs-open.png" width="780" alt="Multiple tabs open">
+  <br><em>Safari-style tab bar with multiple PDFs open simultaneously</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/grid-view.png" width="780" alt="Page grid organizer">
+  <br><em>Page organizer grid — drag to reorder, rotate, duplicate, or delete pages</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/highlight-tools.png" width="780" alt="Annotation tools">
+  <br><em>Context-sensitive annotation palette with highlight, underline, and markup tools</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/sepia-view.png" width="780" alt="Sepia reading mode">
+  <br><em>Sepia reading mode for comfortable long-form reading</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/night-mode-1.png" width="780" alt="Night reading mode">
+  <br><em>Night mode — inverted dark background for low-light reading</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/night-mode-2.png" width="780" alt="Night mode with annotation palette">
+  <br><em>Night mode with the annotation palette active</em>
+</p>
+
+<p align="center">
+  <img src="Screenshots/settings-view.png" width="780" alt="Settings — General pane">
+  <br><em>Settings — General pane with theme and tab style options</em>
 </p>
 
 ---
